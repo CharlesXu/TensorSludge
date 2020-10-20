@@ -1,0 +1,13 @@
+[package]
+name = "tensorsludge"
+version = "0.1.0"
+authors = ["Masterchef365 <duncan.freeman1@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+erupt = "0.15"
+anyhow = "1"
+genmap = "1.0"
+
+[dev-dependencies]
+mnist = { version = "0.4", features = ["download"] }
