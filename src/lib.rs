@@ -5,9 +5,11 @@ use genmap::Handle;
 pub struct TensorSludge;
 
 /// A handle referring to a matrix
+#[derive(Copy, Clone)]
 pub struct Matrix(pub(crate) Handle);
 
 /// A handle referring to a pass
+#[derive(Copy, Clone)]
 pub struct Pass(pub(crate) Handle);
 
 /// An operation to be executed on the GPU
