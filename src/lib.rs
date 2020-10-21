@@ -15,6 +15,7 @@ pub struct Matrix(pub(crate) Handle);
 pub struct Pass(pub(crate) Handle);
 
 /// An operation to be executed on the GPU
+#[derive(Copy, Clone)]
 pub enum Operation {
     /// Perform matrix multiplication, dotting `left` and `right` and storing in `dst`. If either
     /// of the `_transpose` flags are set, operate the matrix multiplication as if

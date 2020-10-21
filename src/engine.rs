@@ -1,5 +1,6 @@
 use crate::matrix::Matrix;
 use crate::sigmoid::Sigmoid;
+use crate::Operation;
 use anyhow::{format_err, Context, Result};
 use erupt::{
     cstr,
@@ -15,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
+    passes: GenMap<Pass>,
     matrices: GenMap<Matrix>,
     core: SharedCore,
     sigmoid: Sigmoid,
@@ -100,6 +102,7 @@ impl TensorSludge {
 
         Ok(Self {
             matrices: GenMap::with_capacity(10),
+            passes: GenMap::with_capacity(10),
             sigmoid,
             queue,
             core,
@@ -115,32 +118,36 @@ impl TensorSludge {
         )?)))
     }
 
-    fn get_matrix<'a>(&'a mut self, matrix: crate::Matrix) -> Result<&'a mut Matrix> {
+    fn get_matrix_mut<'a>(&'a mut self, matrix: crate::Matrix) -> Result<&'a mut Matrix> {
         self.matrices
             .get_mut(matrix.0)
             .context("Matrix was deleted")
     }
 
+    fn get_matrix<'a>(&'a self, matrix: crate::Matrix) -> Result<&'a Matrix> {
+        self.matrices
+            .get(matrix.0)
+            .context("Matrix was deleted")
+    }
+
     /// Write data to a matrix in row-major order
     pub fn write(&mut self, matrix: crate::Matrix, data: &[f32]) -> Result<()> {
-        self.get_matrix(matrix)?.write(data)
+        self.get_matrix_mut(matrix)?.write(data)
     }
 
     /// Read data from a matrix in row-major order
     pub fn read(&mut self, matrix: crate::Matrix, data: &mut [f32]) -> Result<()> {
-        self.get_matrix(matrix)?.read(data)
+        self.get_matrix_mut(matrix)?.read(data)
     }
 
     /// Create a pass from a sequence of operations
     pub fn create_pass(&mut self, ops: &[crate::Operation]) -> Result<crate::Pass> {
-        use crate::Operation as Op;
-
         // Collect descriptor pool sizes and layouts from each of the operations
         let mut pool_sizes = Vec::new();
         let mut descriptor_set_layouts = Vec::new();
         for op in ops {
             match op {
-                Op::Sigmoid(_) => {
+                Operation::Sigmoid(_) => {
                     Sigmoid::desc_pool_sizes(&mut pool_sizes);
                     descriptor_set_layouts.push(self.sigmoid.desc_set_layout());
                 }
@@ -166,12 +173,57 @@ impl TensorSludge {
         let descriptor_sets =
             unsafe { self.core.device.allocate_descriptor_sets(&create_info) }.result()?;
 
-        todo!("create_pass")
+        // Create descriptor set update list
+        let mut update_list = Vec::with_capacity(descriptor_sets.len());
+        let mut desc_iter = descriptor_sets.into_iter();
+        for op in ops {
+            match op {
+                Operation::Sigmoid(_) => update_list.push((*op, desc_iter.next().unwrap())),
+                _ => todo!("Not all ops are implemented"),
+            }
+        }
+
+        let pass = Pass {
+            descriptor_pool,
+            update_list,
+            core: self.core.clone(),
+        };
+
+        // Allocate and write command buffer
+
+        Ok(crate::Pass(self.passes.insert(pass)))
     }
 
     /// Run the specified pass on the TensorSludge engine
     pub fn flow(&mut self, pass: crate::Pass) -> Result<()> {
+        let pass = self.passes.get(pass.0).context("Pass was deleted")?;
+        
+        // Update descriptor sets to match passed matrices (This is done here because matrices may
+        // have been deleted)
+        for (op, set) in &pass.update_list {
+            match op {
+                Operation::Sigmoid(mat) => {
+                    self.sigmoid.write_desc_set(*set, self.get_matrix(*mat)?);
+                }
+                _ => todo!("Not all ops are implemented"),
+            }
+        }
+
         todo!("flow")
+    }
+}
+
+struct Pass {
+    update_list: Vec<(crate::Operation, vk::DescriptorSet)>,
+    descriptor_pool: vk::DescriptorPool,
+    core: SharedCore,
+}
+
+impl Drop for Pass {
+    fn drop(&mut self) {
+        unsafe {
+            self.core.device.destroy_descriptor_pool(Some(self.descriptor_pool), None);
+        }
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::engine::SharedCore;
 use anyhow::Result;
 use erupt::{
-    utils::allocator::{Allocation, MemoryTypeFinder, MappedMemory},
+    utils::allocator::{Allocation, MappedMemory, MemoryTypeFinder},
     vk1_0 as vk,
 };
 
@@ -46,13 +46,12 @@ impl Matrix {
         self.cols
     }
 
+    pub fn allocation<'a>(&'a self) -> &'a Allocation<vk::Buffer> {
+        self.data.as_ref().unwrap()
+    }
+
     fn map(&mut self) -> Result<MappedMemory> {
-        let mapping = self
-            .data
-            .as_ref()
-            .unwrap()
-            .map(&self.core.device, ..)
-            .result()?;
+        let mapping = self.allocation().map(&self.core.device, ..).result()?;
         Ok(mapping)
     }
 
