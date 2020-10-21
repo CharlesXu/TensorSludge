@@ -255,12 +255,20 @@ impl TensorSludge {
                             self.sigmoid.pipeline(),
                         );
 
+                        let mat = self.get_matrix(*mat)?;
                         self.core.device.cmd_dispatch(
                             command_buffer,
-                            ((self.get_matrix(*mat)?.rows() / 16) + 1) as u32,
-                            ((self.get_matrix(*mat)?.cols() / 16) + 1) as u32,
+                            ((mat.rows() / 16) + 1) as u32,
+                            ((mat.cols() / 16) + 1) as u32,
                             1,
                         );
+
+                        let buf_mem_barrier = vk::BufferMemoryBarrierBuilder::new()
+                            .buffer(*mat.allocation().object())
+                            .src_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
+                            .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
+                            .offset(0)
+                            .size(vk::WHOLE_SIZE);
 
                         self.core.device.cmd_pipeline_barrier(
                             command_buffer,
@@ -268,7 +276,7 @@ impl TensorSludge {
                             vk::PipelineStageFlags::COMPUTE_SHADER,
                             None,
                             &[],
-                            &[],
+                            &[buf_mem_barrier],
                             &[],
                         );
                     }
