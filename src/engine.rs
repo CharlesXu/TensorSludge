@@ -94,8 +94,9 @@ impl TensorSludge {
 
         // Create command buffer
         // Command pool:
-        let create_info =
-            vk::CommandPoolCreateInfoBuilder::new().queue_family_index(queue_family_index);
+        let create_info = vk::CommandPoolCreateInfoBuilder::new()
+            .queue_family_index(queue_family_index)
+            .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
         let command_pool =
             unsafe { device.create_command_pool(&create_info, None, None) }.result()?;
 
@@ -199,9 +200,6 @@ impl TensorSludge {
         let command_buffer =
             unsafe { self.core.device.allocate_command_buffers(&allocate_info) }.result()?[0];
 
-        // Write command buffer
-        
-
         let pass = Pass {
             command_buffer,
             descriptor_pool,
@@ -227,10 +225,13 @@ impl TensorSludge {
             }
         }
 
+        // Write command buffer
         let command_buffer = pass.command_buffer;
-
         unsafe {
-            self.core.device.reset_command_buffer(command_buffer, None).result()?;
+            self.core
+                .device
+                .reset_command_buffer(command_buffer, None)
+                .result()?;
             let begin_info = vk::CommandBufferBeginInfoBuilder::new();
             self.core
                 .device
@@ -261,13 +262,23 @@ impl TensorSludge {
                             1,
                         );
 
-                        // TODO: PIPELINE BARRIER NEEDS TO BE FINER GRAINED (MEMORY/EXEC!)
-                        //self.core.device.
+                        self.core.device.cmd_pipeline_barrier(
+                            command_buffer,
+                            vk::PipelineStageFlags::COMPUTE_SHADER,
+                            vk::PipelineStageFlags::COMPUTE_SHADER,
+                            None,
+                            &[],
+                            &[],
+                            &[],
+                        );
                     }
                     _ => todo!("Not all ops are implemented"),
                 }
             }
-            self.core.device.end_command_buffer(command_buffer).result()?;
+            self.core
+                .device
+                .end_command_buffer(command_buffer)
+                .result()?;
         }
 
         unsafe {
@@ -297,7 +308,7 @@ impl Drop for Pass {
             self.core
                 .device
                 .destroy_descriptor_pool(Some(self.descriptor_pool), None);
-            }
+        }
     }
 }
 
