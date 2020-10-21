@@ -16,6 +16,17 @@ Implementation:
 * Matrices:
     * Allow read/write, are created uninitialized..?
 
+So on pass creation, we:
+* Create descriptor pool with exactly as many descriptor sets we need
+* Create descriptor sets based on ops
+    * Eventually use a HashMap to persist and re-use these combinations...
+* Write command buffer
+
+On flow we: 
+* Update descriptor sets (from stored keys)
+* Submit command buffer to queue
+* Wait for idle
+
 Interfacing:
 ```rust
 let mut ts = TensorSludge::new();

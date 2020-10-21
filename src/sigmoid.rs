@@ -61,6 +61,12 @@ impl Sigmoid {
             core,
         })
     }
+
+    pub fn desc_pool_sizes(sizes: &mut Vec<vk::DescriptorPoolSizeBuilder>) {
+        sizes.push(vk::DescriptorPoolSizeBuilder::new()
+        ._type(vk::DescriptorType::STORAGE_BUFFER)
+        .descriptor_count(1))
+    }
 }
 
 impl Drop for Sigmoid {

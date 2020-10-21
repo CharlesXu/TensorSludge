@@ -133,6 +133,23 @@ impl TensorSludge {
 
     /// Create a pass from a sequence of operations
     pub fn create_pass(&mut self, ops: &[crate::Operation]) -> Result<crate::Pass> {
+        use crate::Operation as Op;
+
+        // Collect pool sizes from each of the operations
+        let mut pool_sizes = Vec::new();
+        for op in ops {
+            match op {
+                Op::Sigmoid(_) => Sigmoid::desc_pool_sizes(&mut pool_sizes),
+                _ => todo!("Not all ops are implemented"),
+            }
+        }
+
+        let create_info = vk::DescriptorPoolCreateInfoBuilder::new()
+            .pool_sizes(&pool_sizes)
+            .max_sets(ops.len() as _); // TODO: Some ops might not need descriptor sets at all! This is potentially wasteful
+        let descriptor_pool =
+            unsafe { self.core.device.create_descriptor_pool(&create_info, None, None) }.result()?;
+
         todo!("create_pass")
     }
 
