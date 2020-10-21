@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 pub struct Sigmoid {
     pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
 }
@@ -64,9 +65,18 @@ impl Sigmoid {
 
         Ok(Self {
             pipeline,
+            pipeline_layout,
             descriptor_set_layout,
             core,
         })
+    }
+
+    pub fn pipeline_layout(&self) -> vk::PipelineLayout {
+        self.pipeline_layout
+    }
+
+    pub fn pipeline(&self) -> vk::Pipeline {
+        self.pipeline
     }
 
     pub fn write_desc_set(&self, descriptor_set: vk::DescriptorSet, matrix: &Matrix) {

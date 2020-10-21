@@ -19,11 +19,6 @@ fn main() -> Result<()> {
         },
         */
         Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
     ])?;
 
     ts.write(
@@ -48,8 +43,8 @@ fn main() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut output = [0.; 3];
-    ts.read(dst, &mut output)?;
+    let mut output = [0.; 3 * 3];
+    ts.read(a, &mut output)?;
     //ts.read(a, &mut output)?;
 
     /*

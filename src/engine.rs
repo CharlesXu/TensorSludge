@@ -16,6 +16,7 @@ use std::sync::{Arc, Mutex};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
+    command_pool: vk::CommandPool,
     passes: GenMap<Pass>,
     matrices: GenMap<Matrix>,
     core: SharedCore,
@@ -91,6 +92,13 @@ impl TensorSludge {
         let allocator =
             Allocator::new(&instance, physical_device, AllocatorCreateInfo::default()).result()?;
 
+        // Create command buffer
+        // Command pool:
+        let create_info =
+            vk::CommandPoolCreateInfoBuilder::new().queue_family_index(queue_family_index);
+        let command_pool =
+            unsafe { device.create_command_pool(&create_info, None, None) }.result()?;
+
         let core = Arc::new(Core {
             allocator: Mutex::new(allocator),
             device,
@@ -101,6 +109,7 @@ impl TensorSludge {
         let sigmoid = Sigmoid::new(core.clone())?;
 
         Ok(Self {
+            command_pool,
             matrices: GenMap::with_capacity(10),
             passes: GenMap::with_capacity(10),
             sigmoid,
@@ -125,9 +134,7 @@ impl TensorSludge {
     }
 
     fn get_matrix<'a>(&'a self, matrix: crate::Matrix) -> Result<&'a Matrix> {
-        self.matrices
-            .get(matrix.0)
-            .context("Matrix was deleted")
+        self.matrices.get(matrix.0).context("Matrix was deleted")
     }
 
     /// Write data to a matrix in row-major order
@@ -183,13 +190,24 @@ impl TensorSludge {
             }
         }
 
+        // Allocate command buffer
+        let allocate_info = vk::CommandBufferAllocateInfoBuilder::new()
+            .command_pool(self.command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+
+        let command_buffer =
+            unsafe { self.core.device.allocate_command_buffers(&allocate_info) }.result()?[0];
+
+        // Write command buffer
+        
+
         let pass = Pass {
+            command_buffer,
             descriptor_pool,
             update_list,
             core: self.core.clone(),
         };
-
-        // Allocate and write command buffer
 
         Ok(crate::Pass(self.passes.insert(pass)))
     }
@@ -197,7 +215,7 @@ impl TensorSludge {
     /// Run the specified pass on the TensorSludge engine
     pub fn flow(&mut self, pass: crate::Pass) -> Result<()> {
         let pass = self.passes.get(pass.0).context("Pass was deleted")?;
-        
+
         // Update descriptor sets to match passed matrices (This is done here because matrices may
         // have been deleted)
         for (op, set) in &pass.update_list {
@@ -209,21 +227,77 @@ impl TensorSludge {
             }
         }
 
-        todo!("flow")
+        let command_buffer = pass.command_buffer;
+
+        unsafe {
+            self.core.device.reset_command_buffer(command_buffer, None).result()?;
+            let begin_info = vk::CommandBufferBeginInfoBuilder::new();
+            self.core
+                .device
+                .begin_command_buffer(command_buffer, &begin_info)
+                .result()?;
+            for (op, set) in &pass.update_list {
+                match op {
+                    Operation::Sigmoid(mat) => {
+                        self.core.device.cmd_bind_descriptor_sets(
+                            command_buffer,
+                            vk::PipelineBindPoint::COMPUTE,
+                            self.sigmoid.pipeline_layout(),
+                            0,
+                            &[*set],
+                            &[],
+                        );
+
+                        self.core.device.cmd_bind_pipeline(
+                            command_buffer,
+                            vk::PipelineBindPoint::COMPUTE,
+                            self.sigmoid.pipeline(),
+                        );
+
+                        self.core.device.cmd_dispatch(
+                            command_buffer,
+                            ((self.get_matrix(*mat)?.rows() / 16) + 1) as u32,
+                            ((self.get_matrix(*mat)?.cols() / 16) + 1) as u32,
+                            1,
+                        );
+
+                        // TODO: PIPELINE BARRIER NEEDS TO BE FINER GRAINED (MEMORY/EXEC!)
+                        //self.core.device.
+                    }
+                    _ => todo!("Not all ops are implemented"),
+                }
+            }
+            self.core.device.end_command_buffer(command_buffer).result()?;
+        }
+
+        unsafe {
+            let command_buffers = [pass.command_buffer];
+            let submit_info = vk::SubmitInfoBuilder::new().command_buffers(&command_buffers);
+            self.core
+                .device
+                .queue_submit(self.queue, &[submit_info], None)
+                .result()?;
+            self.core.device.queue_wait_idle(self.queue).result()?;
+        }
+
+        Ok(())
     }
 }
 
 struct Pass {
     update_list: Vec<(crate::Operation, vk::DescriptorSet)>,
     descriptor_pool: vk::DescriptorPool,
+    command_buffer: vk::CommandBuffer,
     core: SharedCore,
 }
 
 impl Drop for Pass {
     fn drop(&mut self) {
         unsafe {
-            self.core.device.destroy_descriptor_pool(Some(self.descriptor_pool), None);
-        }
+            self.core
+                .device
+                .destroy_descriptor_pool(Some(self.descriptor_pool), None);
+            }
     }
 }
 
