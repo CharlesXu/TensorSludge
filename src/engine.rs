@@ -1,27 +1,34 @@
+use crate::matrix::Matrix;
 use crate::sigmoid::Sigmoid;
-use anyhow::{Result, Context, format_err};
-use genmap::Handle;
+use anyhow::{format_err, Result};
 use erupt::{
     cstr,
     utils::{
-        allocator::{Allocator, AllocatorCreateInfo, MemoryTypeFinder},
-        decode_spv,
+        allocator::{Allocator, AllocatorCreateInfo},
         loading::DefaultEntryLoader,
     },
     vk1_0 as vk, DeviceLoader, EntryLoader, InstanceLoader,
 };
+use genmap::{GenMap, Handle};
 use std::ffi::CString;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
+    matrices: GenMap<Matrix>,
+    core: SharedCore,
     sigmoid: Sigmoid,
-    allocator: Allocator,
     queue: vk::Queue,
-    device: Arc<DeviceLoader>,
-    instance: InstanceLoader,
+}
+
+pub struct Core {
+    pub allocator: Mutex<Allocator>,
+    pub device: DeviceLoader,
+    pub instance: InstanceLoader,
     _entry: DefaultEntryLoader,
 }
+
+pub type SharedCore = Arc<Core>;
 
 impl TensorSludge {
     /// Create a new TensorSludge instance
@@ -76,28 +83,36 @@ impl TensorSludge {
             .enabled_layer_names(&device_layers);
 
         let device = DeviceLoader::new(&instance, physical_device, &create_info, None)?;
-        let device = Arc::new(device);
         let queue = unsafe { device.get_device_queue(queue_family_index, 0, None) };
 
         // Allocator
-        let mut allocator =
+        let allocator =
             Allocator::new(&instance, physical_device, AllocatorCreateInfo::default()).result()?;
 
-        let sigmoid = Sigmoid::new(device.clone())?;
-
-        Ok(Self {
-            sigmoid,
-            allocator,
-            queue,
+        let core = Arc::new(Core {
+            allocator: Mutex::new(allocator),
             device,
             instance,
             _entry: entry,
+        });
+
+        let sigmoid = Sigmoid::new(core.clone())?;
+
+        Ok(Self {
+            matrices: GenMap::with_capacity(10),
+            sigmoid,
+            queue,
+            core,
         })
     }
 
     /// Create a new matrix with the specified dimensions
     pub fn matrix(&mut self, rows: usize, cols: usize) -> Result<crate::Matrix> {
-        todo!("matrix")
+        Ok(crate::Matrix(self.matrices.insert(Matrix::new(
+            rows,
+            cols,
+            self.core.clone(),
+        )?)))
     }
 
     /// Write data to a matrix in row-major order
@@ -135,7 +150,15 @@ fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)>
     Err(format_err!("No suitable device found"))
 }
 
-impl Drop for TensorSludge {
-    fn drop(&mut self) {
+use std::sync::MutexGuard;
+impl Core {
+    pub fn allocator(&self) -> Result<MutexGuard<Allocator>> {
+        self.allocator
+            .lock()
+            .map_err(|_| format_err!("Allocator mutex poisoned"))
     }
+}
+
+impl Drop for TensorSludge {
+    fn drop(&mut self) {}
 }
