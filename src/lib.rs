@@ -3,6 +3,7 @@ use genmap::Handle;
 mod engine;
 mod sigmoid;
 mod matrix;
+mod pass;
 pub use engine::TensorSludge;
 
 /// A handle referring to a matrix

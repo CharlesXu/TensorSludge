@@ -1,6 +1,6 @@
 use crate::matrix::Matrix;
 use crate::sigmoid::Sigmoid;
-use anyhow::{format_err, Result};
+use anyhow::{format_err, Context, Result};
 use erupt::{
     cstr,
     utils::{
@@ -115,14 +115,20 @@ impl TensorSludge {
         )?)))
     }
 
+    fn get_matrix<'a>(&'a mut self, matrix: crate::Matrix) -> Result<&'a mut Matrix> {
+        self.matrices
+            .get_mut(matrix.0)
+            .context("Matrix was deleted")
+    }
+
     /// Write data to a matrix in row-major order
     pub fn write(&mut self, matrix: crate::Matrix, data: &[f32]) -> Result<()> {
-        todo!("write")
+        self.get_matrix(matrix)?.write(data)
     }
 
     /// Read data from a matrix in row-major order
     pub fn read(&mut self, matrix: crate::Matrix, data: &mut [f32]) -> Result<()> {
-        todo!("read")
+        self.get_matrix(matrix)?.read(data)
     }
 
     /// Create a pass from a sequence of operations

@@ -8,6 +8,7 @@ fn main() -> Result<()> {
     let b = ts.matrix(3, 1)?;
     let dst = ts.matrix(3, 1)?;
 
+    /*
     let pass = ts.create_pass(&[
         /*
         Operation::MatrixMultiply {
@@ -20,6 +21,7 @@ fn main() -> Result<()> {
         */
         Operation::Sigmoid(a),
     ])?;
+        */
 
     ts.write(
         a,
@@ -41,10 +43,11 @@ fn main() -> Result<()> {
     )?;
     */
 
-    ts.flow(pass)?;
+    //ts.flow(pass)?;
 
     let mut output = [0.; 3 * 3];
-    ts.read(dst, &mut output)?;
+    //ts.read(dst, &mut output)?;
+    ts.read(a, &mut output)?;
 
     /*
     assert!((output[0] - 68.) <= std::f32::EPSILON);
