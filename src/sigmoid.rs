@@ -62,6 +62,10 @@ impl Sigmoid {
         })
     }
 
+    pub fn desc_set_layout(&self) -> vk::DescriptorSetLayout {
+        self.descriptor_set_layout
+    }
+
     pub fn desc_pool_sizes(sizes: &mut Vec<vk::DescriptorPoolSizeBuilder>) {
         sizes.push(vk::DescriptorPoolSizeBuilder::new()
         ._type(vk::DescriptorType::STORAGE_BUFFER)

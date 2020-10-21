@@ -19,6 +19,11 @@ fn main() -> Result<()> {
         },
         */
         Operation::Sigmoid(a),
+        Operation::Sigmoid(a),
+        Operation::Sigmoid(a),
+        Operation::Sigmoid(a),
+        Operation::Sigmoid(a),
+        Operation::Sigmoid(a),
     ])?;
 
     ts.write(
