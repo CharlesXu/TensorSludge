@@ -194,7 +194,6 @@ impl TensorSludge {
                 .result()?;
 
             for (invocation, actions) in dispatch_list {
-                invocation.dispatch(&self.core.device, command_buffer);
 
                 let mut barriers = Vec::new();
                 for action in actions {
@@ -232,6 +231,8 @@ impl TensorSludge {
                     &barriers,
                     &[],
                 );
+
+                invocation.dispatch(&self.core.device, command_buffer);
             }
 
             self.core
