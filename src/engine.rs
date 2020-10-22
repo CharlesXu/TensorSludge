@@ -1,7 +1,7 @@
 use crate::matrix::Matrix;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
-use anyhow::{format_err, bail, Context, Result};
+use anyhow::{bail, format_err, Context, Result};
 use erupt::{
     cstr,
     utils::{
@@ -11,9 +11,10 @@ use erupt::{
     vk1_0 as vk, DeviceLoader, EntryLoader, InstanceLoader,
 };
 use genmap::{GenMap, Handle};
+use std::collections::HashSet;
 use std::ffi::CString;
-use std::sync::{Arc, Mutex};
 use std::sync::MutexGuard;
+use std::sync::{Arc, Mutex};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
@@ -97,7 +98,7 @@ impl TensorSludge {
         // Command pool:
         let create_info = vk::CommandPoolCreateInfoBuilder::new()
             .queue_family_index(queue_family_index)
-            .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
+            .flags(vk::CommandPoolCreateFlags::empty());
         let command_pool =
             unsafe { device.create_command_pool(&create_info, None, None) }.result()?;
 
@@ -160,67 +161,89 @@ impl TensorSludge {
         let command_buffer =
             unsafe { self.core.device.allocate_command_buffers(&allocate_info) }.result()?[0];
 
-        let pass = Pass {
-            command_buffer,
-        };
-
-        /*
-        // Update descriptor sets to match passed matrices (This is done here because matrices may
-        // have been deleted)
-        for (op, set) in &pass.update_list {
+        // Create dispatch information and required matrix list
+        // This must be a seperate loop because the descriptor set update happens in invoke() for
+        // each type of operation
+        let mut required_mats = Vec::new();
+        let mut dispatch_list: Vec<(Box<dyn Invocation>, Vec<BufferAction>)> = Vec::new();
+        for op in ops {
             match op {
                 Operation::Sigmoid(mat) => {
-                    self.sigmoid.write_desc_set(*set, self.get_matrix(*mat)?);
+                    required_mats.push(mat.0);
+                    let invocation = self
+                        .sigmoid
+                        .invoke(self.matrices.get(mat.0).context("Matrix was deleted")?)?;
+                    let actions = vec![BufferAction {
+                        matrix: mat.0,
+                        read: true,
+                        write: true,
+                    }];
+                    dispatch_list.push((Box::new(invocation), actions));
                 }
-                _ => todo!("Not all ops are implemented"),
+                _ => todo!("Some ops not implemented"),
             }
         }
 
         // Write command buffer
-        let command_buffer = pass.command_buffer;
+        let mut dirty_list = HashSet::new(); // Naughy buffers!
         unsafe {
-            self.core
-                .device
-                .reset_command_buffer(command_buffer, None)
-                .result()?;
             let begin_info = vk::CommandBufferBeginInfoBuilder::new();
             self.core
                 .device
                 .begin_command_buffer(command_buffer, &begin_info)
                 .result()?;
-            for (op, set) in &pass.update_list {
-                match op {
-                    Operation::Sigmoid(mat) => {
 
+            for (invocation, actions) in dispatch_list {
+                invocation.dispatch(&self.core.device, command_buffer);
+
+                let mut barriers = Vec::new();
+                for action in actions {
+                    if (action.read || action.write) && dirty_list.remove(&action.matrix) {
+                        let buffer = self.matrices.get(action.matrix).unwrap();
+                        let dst_flags = match (action.read, action.write) {
+                            (true, false) => vk::AccessFlags::SHADER_READ,
+                            (true, true) => {
+                                vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE
+                            }
+                            (false, true) => vk::AccessFlags::SHADER_WRITE,
+                            (false, false) => unreachable!(),
+                        };
                         let buf_mem_barrier = vk::BufferMemoryBarrierBuilder::new()
-                            .buffer(*mat.allocation().object())
-                            //.src_access_mask(vk::AccessFlags::SHADER_WRITE)
-                            .src_access_mask(vk::AccessFlags::empty())
-                            //.dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
-                            .dst_access_mask(vk::AccessFlags::SHADER_READ)
+                            .buffer(*buffer.allocation().object())
+                            .src_access_mask(vk::AccessFlags::SHADER_WRITE)
+                            .dst_access_mask(dst_flags)
                             .offset(0)
                             .size(vk::WHOLE_SIZE);
 
-                        self.core.device.cmd_pipeline_barrier(
-                            command_buffer,
-                            vk::PipelineStageFlags::COMPUTE_SHADER,
-                            vk::PipelineStageFlags::COMPUTE_SHADER,
-                            None,
-                            &[],
-                            &[buf_mem_barrier],
-                            &[],
-                        );
+                        barriers.push(buf_mem_barrier);
                     }
-                    _ => todo!("Not all ops are implemented"),
+
+                    if action.write {
+                        dirty_list.insert(action.matrix);
+                    }
                 }
+
+                self.core.device.cmd_pipeline_barrier(
+                    command_buffer,
+                    vk::PipelineStageFlags::COMPUTE_SHADER,
+                    vk::PipelineStageFlags::COMPUTE_SHADER,
+                    None,
+                    &[],
+                    &barriers,
+                    &[],
+                );
             }
+
             self.core
                 .device
                 .end_command_buffer(command_buffer)
                 .result()?;
         }
-        */
 
+        let pass = Pass {
+            command_buffer,
+            required_mats,
+        };
 
         Ok(crate::Pass(self.passes.insert(pass)))
     }
@@ -251,6 +274,16 @@ impl TensorSludge {
 struct Pass {
     command_buffer: vk::CommandBuffer,
     required_mats: Vec<Handle>,
+}
+
+pub trait Invocation {
+    fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer);
+}
+
+struct BufferAction {
+    matrix: Handle,
+    read: bool,
+    write: bool,
 }
 
 fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)> {

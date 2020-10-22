@@ -117,8 +117,8 @@ impl Sigmoid {
     }
 }
 
-impl Invocation {
-    pub fn invoke(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
+impl crate::engine::Invocation for Invocation {
+    fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
         unsafe {
             device.cmd_bind_descriptor_sets(
                 command_buffer,

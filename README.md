@@ -1,10 +1,14 @@
-Goals:
+## Goals:
 * Simple! Don't overextend yourself. 
     * Barriers after every step; this is a line, not a graph
 * Don't be afraid to make _this_ version totally inefficient just to get it to work
 * Train and evaluate on the MNIST dataset
 
-Implementation:
+## TODO:
+* Allow naming of matrices for debugging!
+    * String for name, with custom hash impl to only use handle hash
+
+## Implementation:
 * Per compute shader:
     * One descriptor set layout 
     * One pipeline layout
