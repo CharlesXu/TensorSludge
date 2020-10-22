@@ -4,6 +4,7 @@ mod engine;
 mod sigmoid;
 mod matrix;
 mod pass;
+mod desc_set_allocator;
 pub use engine::TensorSludge;
 
 /// A handle referring to a matrix

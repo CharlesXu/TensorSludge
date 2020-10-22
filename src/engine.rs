@@ -1,7 +1,7 @@
 use crate::matrix::Matrix;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
-use anyhow::{format_err, Context, Result};
+use anyhow::{format_err, bail, Context, Result};
 use erupt::{
     cstr,
     utils::{
@@ -13,6 +13,7 @@ use erupt::{
 use genmap::{GenMap, Handle};
 use std::ffi::CString;
 use std::sync::{Arc, Mutex};
+use std::sync::MutexGuard;
 
 /// The TensorSludge engine
 pub struct TensorSludge {
@@ -150,47 +151,6 @@ impl TensorSludge {
 
     /// Create a pass from a sequence of operations
     pub fn create_pass(&mut self, ops: &[crate::Operation]) -> Result<crate::Pass> {
-        // Collect descriptor pool sizes and layouts from each of the operations
-        let mut pool_sizes = Vec::new();
-        let mut descriptor_set_layouts = Vec::new();
-        for op in ops {
-            match op {
-                Operation::Sigmoid(_) => {
-                    Sigmoid::desc_pool_sizes(&mut pool_sizes);
-                    descriptor_set_layouts.push(self.sigmoid.desc_set_layout());
-                }
-                _ => todo!("Not all ops are implemented"),
-            }
-        }
-
-        // Create descriptor pool of appropriate size
-        let create_info = vk::DescriptorPoolCreateInfoBuilder::new()
-            .pool_sizes(&pool_sizes)
-            .max_sets(ops.len() as _); // TODO: Some ops might not need descriptor sets at all! This is potentially wasteful
-        let descriptor_pool = unsafe {
-            self.core
-                .device
-                .create_descriptor_pool(&create_info, None, None)
-        }
-        .result()?;
-
-        // Create descriptor sets
-        let create_info = vk::DescriptorSetAllocateInfoBuilder::new()
-            .descriptor_pool(descriptor_pool)
-            .set_layouts(&descriptor_set_layouts);
-        let descriptor_sets =
-            unsafe { self.core.device.allocate_descriptor_sets(&create_info) }.result()?;
-
-        // Create descriptor set update list
-        let mut update_list = Vec::with_capacity(descriptor_sets.len());
-        let mut desc_iter = descriptor_sets.into_iter();
-        for op in ops {
-            match op {
-                Operation::Sigmoid(_) => update_list.push((*op, desc_iter.next().unwrap())),
-                _ => todo!("Not all ops are implemented"),
-            }
-        }
-
         // Allocate command buffer
         let allocate_info = vk::CommandBufferAllocateInfoBuilder::new()
             .command_pool(self.command_pool)
@@ -202,18 +162,9 @@ impl TensorSludge {
 
         let pass = Pass {
             command_buffer,
-            descriptor_pool,
-            update_list,
-            core: self.core.clone(),
         };
 
-        Ok(crate::Pass(self.passes.insert(pass)))
-    }
-
-    /// Run the specified pass on the TensorSludge engine
-    pub fn flow(&mut self, pass: crate::Pass) -> Result<()> {
-        let pass = self.passes.get(pass.0).context("Pass was deleted")?;
-
+        /*
         // Update descriptor sets to match passed matrices (This is done here because matrices may
         // have been deleted)
         for (op, set) in &pass.update_list {
@@ -240,28 +191,6 @@ impl TensorSludge {
             for (op, set) in &pass.update_list {
                 match op {
                     Operation::Sigmoid(mat) => {
-                        self.core.device.cmd_bind_descriptor_sets(
-                            command_buffer,
-                            vk::PipelineBindPoint::COMPUTE,
-                            self.sigmoid.pipeline_layout(),
-                            0,
-                            &[*set],
-                            &[],
-                        );
-
-                        self.core.device.cmd_bind_pipeline(
-                            command_buffer,
-                            vk::PipelineBindPoint::COMPUTE,
-                            self.sigmoid.pipeline(),
-                        );
-
-                        let mat = self.get_matrix(*mat)?;
-                        self.core.device.cmd_dispatch(
-                            command_buffer,
-                            ((mat.rows() / 16) + 1) as u32,
-                            ((mat.cols() / 16) + 1) as u32,
-                            1,
-                        );
 
                         let buf_mem_barrier = vk::BufferMemoryBarrierBuilder::new()
                             .buffer(*mat.allocation().object())
@@ -290,6 +219,20 @@ impl TensorSludge {
                 .end_command_buffer(command_buffer)
                 .result()?;
         }
+        */
+
+
+        Ok(crate::Pass(self.passes.insert(pass)))
+    }
+
+    /// Run the specified pass on the TensorSludge engine
+    pub fn flow(&mut self, pass: crate::Pass) -> Result<()> {
+        let pass = self.passes.get(pass.0).context("Pass was deleted")?;
+        for matrix in &pass.required_mats {
+            if self.matrices.get(*matrix).is_none() {
+                bail!("A matrix used in this pass was deleted since its creation");
+            }
+        }
 
         unsafe {
             let command_buffers = [pass.command_buffer];
@@ -306,20 +249,8 @@ impl TensorSludge {
 }
 
 struct Pass {
-    update_list: Vec<(crate::Operation, vk::DescriptorSet)>,
-    descriptor_pool: vk::DescriptorPool,
     command_buffer: vk::CommandBuffer,
-    core: SharedCore,
-}
-
-impl Drop for Pass {
-    fn drop(&mut self) {
-        unsafe {
-            self.core
-                .device
-                .destroy_descriptor_pool(Some(self.descriptor_pool), None);
-        }
-    }
+    required_mats: Vec<Handle>,
 }
 
 fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)> {
@@ -336,7 +267,6 @@ fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)>
     Err(format_err!("No suitable device found"))
 }
 
-use std::sync::MutexGuard;
 impl Core {
     pub fn allocator(&self) -> Result<MutexGuard<Allocator>> {
         self.allocator

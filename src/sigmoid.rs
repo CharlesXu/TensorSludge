@@ -1,15 +1,24 @@
+use crate::desc_set_allocator::DescriptorSetAllocator;
 use crate::engine::SharedCore;
 use crate::matrix::Matrix;
 use anyhow::{Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
-use std::sync::Arc;
 
 pub struct Sigmoid {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
+    ds_allocator: DescriptorSetAllocator,
+}
+
+pub struct Invocation {
+    descriptor_set: vk::DescriptorSet,
+    pipeline_layout: vk::PipelineLayout,
+    invocations_x: u32,
+    invocations_y: u32,
+    pipeline: vk::Pipeline,
 }
 
 impl Sigmoid {
@@ -63,24 +72,24 @@ impl Sigmoid {
             core.device.destroy_shader_module(Some(shader_module), None);
         }
 
+        // Create descriptor set allocator
+        let dpsbs = vec![vk::DescriptorPoolSizeBuilder::new()
+            ._type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)];
+        let ds_allocator = DescriptorSetAllocator::new(dpsbs, descriptor_set_layout, core.clone());
+
         Ok(Self {
             pipeline,
             pipeline_layout,
             descriptor_set_layout,
+            ds_allocator,
             core,
         })
     }
 
-    pub fn pipeline_layout(&self) -> vk::PipelineLayout {
-        self.pipeline_layout
-    }
-
-    pub fn pipeline(&self) -> vk::Pipeline {
-        self.pipeline
-    }
-
-    pub fn write_desc_set(&self, descriptor_set: vk::DescriptorSet, matrix: &Matrix) {
+    pub fn invoke(&mut self, matrix: &Matrix) -> Result<Invocation> {
         let allocation = matrix.allocation();
+        let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
             self.core.device.update_descriptor_sets(
                 &[vk::WriteDescriptorSetBuilder::new()
@@ -94,18 +103,40 @@ impl Sigmoid {
                 &[],
             )
         };
-    }
 
-    pub fn desc_set_layout(&self) -> vk::DescriptorSetLayout {
-        self.descriptor_set_layout
-    }
+        let invocations_x = ((matrix.rows() / 16) + 1) as u32;
+        let invocations_y = ((matrix.cols() / 16) + 1) as u32;
 
-    pub fn desc_pool_sizes(sizes: &mut Vec<vk::DescriptorPoolSizeBuilder>) {
-        sizes.push(
-            vk::DescriptorPoolSizeBuilder::new()
-                ._type(vk::DescriptorType::STORAGE_BUFFER)
-                .descriptor_count(1),
-        )
+        Ok(Invocation {
+            pipeline: self.pipeline,
+            pipeline_layout: self.pipeline_layout,
+            descriptor_set,
+            invocations_x,
+            invocations_y,
+        })
+    }
+}
+
+impl Invocation {
+    pub fn invoke(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline_layout,
+                0,
+                &[self.descriptor_set],
+                &[],
+            );
+
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline,
+            );
+
+            device.cmd_dispatch(command_buffer, self.invocations_x, self.invocations_y, 1);
+        }
     }
 }
 
