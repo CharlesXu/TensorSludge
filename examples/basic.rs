@@ -18,9 +18,9 @@ fn main() -> Result<()> {
             dst,
         },
         */
+        Operation::Sigmoid(b),
         Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
-        Operation::Sigmoid(a),
+        Operation::Sigmoid(b),
     ])?;
 
     ts.write(
@@ -32,7 +32,6 @@ fn main() -> Result<()> {
         ],
     )?;
 
-    /*
     ts.write(
         b,
         &[
@@ -41,12 +40,16 @@ fn main() -> Result<()> {
             12., //
         ],
     )?;
-    */
 
     ts.flow(pass)?;
 
     let mut output = [0.; 3 * 3];
     ts.read(a, &mut output)?;
+    dbg!(output);
+
+    let mut output = [0.; 3];
+    ts.read(b, &mut output)?;
+    dbg!(output);
     //ts.read(a, &mut output)?;
 
     /*
@@ -55,7 +58,6 @@ fn main() -> Result<()> {
     assert!((output[2] - 266.) <= std::f32::EPSILON);
     */
 
-    dbg!(output);
 
     Ok(())
 }

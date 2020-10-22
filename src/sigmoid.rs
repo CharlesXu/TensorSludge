@@ -98,8 +98,8 @@ impl Sigmoid {
                     .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                     .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
                         .buffer(*allocation.object())
-                        .offset(allocation.region().start)
-                        .range(allocation.region().size() as u64)])],
+                        .offset(0)
+                        .range(vk::WHOLE_SIZE)])],
                 &[],
             )
         };
