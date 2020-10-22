@@ -265,8 +265,10 @@ impl TensorSludge {
 
                         let buf_mem_barrier = vk::BufferMemoryBarrierBuilder::new()
                             .buffer(*mat.allocation().object())
-                            .src_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
-                            .dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
+                            //.src_access_mask(vk::AccessFlags::SHADER_WRITE)
+                            .src_access_mask(vk::AccessFlags::empty())
+                            //.dst_access_mask(vk::AccessFlags::SHADER_READ | vk::AccessFlags::SHADER_WRITE)
+                            .dst_access_mask(vk::AccessFlags::SHADER_READ)
                             .offset(0)
                             .size(vk::WHOLE_SIZE);
 
