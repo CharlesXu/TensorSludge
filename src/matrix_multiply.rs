@@ -24,11 +24,23 @@ pub struct Invocation {
 impl MatrixMultiply {
     pub fn new(core: SharedCore) -> Result<Self> {
         // Layout:
-        let bindings = [vk::DescriptorSetLayoutBindingBuilder::new()
+        let bindings = [
+            vk::DescriptorSetLayoutBindingBuilder::new()
             .binding(0)
             .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
             .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::COMPUTE)];
+            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+            vk::DescriptorSetLayoutBindingBuilder::new()
+            .binding(1)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+            vk::DescriptorSetLayoutBindingBuilder::new()
+            .binding(2)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+        ];
 
         let create_info = vk::DescriptorSetLayoutCreateInfoBuilder::new().bindings(&bindings);
 
@@ -39,17 +51,24 @@ impl MatrixMultiply {
         .result()?;
 
         // Load shader
-        let shader_spirv =
-            std::fs::read("shaders/matrix_multiply.comp.spv").context("MatrixMultiply shader failed to load")?;
+        let shader_spirv = std::fs::read("shaders/matrix_multiply.comp.spv")
+            .context("MatrixMultiply shader failed to load")?;
         let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
         let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
         let shader_module =
             unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
 
         // Pipeline
+        let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)
+            .offset(0)
+            .size(std::mem::size_of::<[u32; 5]>() as u32)];
+
         let descriptor_set_layouts = [descriptor_set_layout];
         let create_info =
-            vk::PipelineLayoutCreateInfoBuilder::new().set_layouts(&descriptor_set_layouts);
+            vk::PipelineLayoutCreateInfoBuilder::new()
+            .set_layouts(&descriptor_set_layouts)
+            .push_constant_ranges(&push_constant_ranges);
         let pipeline_layout =
             unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
 
@@ -73,9 +92,12 @@ impl MatrixMultiply {
         }
 
         // Create descriptor set allocator
-        let dpsbs = vec![vk::DescriptorPoolSizeBuilder::new()
-            ._type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)];
+        let dpsbs = vec![
+            vk::DescriptorPoolSizeBuilder::new()
+                ._type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1);
+            3
+        ];
         let ds_allocator = DescriptorSetAllocator::new(dpsbs, descriptor_set_layout, core.clone());
 
         Ok(Self {
@@ -87,7 +109,15 @@ impl MatrixMultiply {
         })
     }
 
-    pub fn invoke(&mut self, matrix: &Matrix) -> Result<Invocation> {
+    pub fn invoke(
+        &mut self,
+        a: &Matrix,
+        a_transpose: bool,
+        b: &Matrix,
+        b_transpose: bool,
+        dst: &Matrix,
+    ) -> Result<Invocation> {
+        /*
         let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
@@ -114,6 +144,8 @@ impl MatrixMultiply {
             invocations_x,
             invocations_y,
         })
+        */
+        todo!()
     }
 }
 

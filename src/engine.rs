@@ -1,4 +1,5 @@
 use crate::matrix::Matrix;
+use crate::matrix_multiply::MatrixMultiply;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
 use anyhow::{bail, format_err, Context, Result};
@@ -23,6 +24,7 @@ pub struct TensorSludge {
     matrices: GenMap<Matrix>,
     core: SharedCore,
     sigmoid: Sigmoid,
+    matrix_multiply: MatrixMultiply,
     queue: vk::Queue,
 }
 
@@ -110,9 +112,11 @@ impl TensorSludge {
         });
 
         let sigmoid = Sigmoid::new(core.clone())?;
+        let matrix_multiply = MatrixMultiply::new(core.clone())?;
 
         Ok(Self {
             command_pool,
+            matrix_multiply,
             matrices: GenMap::with_capacity(10),
             passes: GenMap::with_capacity(10),
             sigmoid,
@@ -180,6 +184,46 @@ impl TensorSludge {
                     }];
                     dispatch_list.push((Box::new(invocation), actions));
                 }
+                Operation::MatrixMultiply {
+                    left,
+                    right,
+                    left_transpose,
+                    right_transpose,
+                    dst,
+                } => {
+                    required_mats.push(left.0);
+                    required_mats.push(right.0);
+                    required_mats.push(dst.0);
+                    let invocation = self.matrix_multiply.invoke(
+                        self.matrices.get(left.0).context("Left mat was deleted")?,
+                        *left_transpose,
+                        self.matrices
+                            .get(right.0)
+                            .context("Right mat was deleted")?,
+                        *right_transpose,
+                        self.matrices
+                            .get(dst.0)
+                            .context("Destination mat was deleted")?,
+                    )?;
+                    let actions = vec![
+                        BufferAction {
+                            matrix: left.0,
+                            read: true,
+                            write: false,
+                        },
+                        BufferAction {
+                            matrix: right.0,
+                            read: true,
+                            write: false,
+                        },
+                        BufferAction {
+                            matrix: dst.0,
+                            read: false,
+                            write: true,
+                        },
+                    ];
+                    dispatch_list.push((Box::new(invocation), actions));
+                }
                 _ => todo!("Some ops not implemented"),
             }
         }
@@ -194,7 +238,6 @@ impl TensorSludge {
                 .result()?;
 
             for (invocation, actions) in dispatch_list {
-
                 let mut barriers = Vec::new();
                 for action in actions {
                     if (action.read || action.write) && dirty_list.remove(&action.matrix) {
