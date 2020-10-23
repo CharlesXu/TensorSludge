@@ -93,7 +93,7 @@ fn main() -> Result<()> {
     ];
     let forward_pass = ts.create_pass(&forward_pass)?;
 
-    let learning_rate = 0.005;
+    let learning_rate = 0.05;
 
     let backward_pass = vec![ // The reverse boof
         Operation::MatrixMultiply { // Compute gradient for weights in layer 2 (outer product)
@@ -151,10 +151,13 @@ fn main() -> Result<()> {
     let mut output_buf = vec![0.; OUTPUT_SIZE];
 
     // Training loop
-    for (label, img) in mnist
+    let mut num_correct = 0;
+    let mut num_total = 0;
+    for (idx, (label, img)) in mnist
         .trn_lbl
         .iter()
         .zip(mnist.trn_img.chunks_exact(IMG_SIZE))
+        .enumerate()
     {
 
         // Feed forward
@@ -163,11 +166,19 @@ fn main() -> Result<()> {
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
 
+        if argmax(&output_buf) == *label as usize {
+            num_correct += 1;
+        }
+        num_total += 1;
+
+        if idx % 100 == 0 {
+            println!("Accuracy: {}", num_correct as f32 / num_total as f32);
+            num_correct = 0;
+            num_total = 0;
+        }
+
         // Difference with train val 
         output_buf[*label as usize] -= 1.;
-
-        //let mse = mse(&output_buf);
-        //println!("Mean squared error: {}", mse);
 
         // Softmax before backprop step
         softmax(&mut output_buf);
@@ -186,16 +197,7 @@ fn main() -> Result<()> {
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
 
-        let mut max = 0.;
-        let mut max_idx = 0;
-        for (idx, &entry) in output_buf.iter().enumerate() {
-            if entry > max {
-                max_idx = idx;
-                max = entry;
-            }
-        }
-
-        if max_idx == *label as usize {
+        if argmax(&output_buf) == *label as usize {
             num_correct += 1;
         }
         num_total += 1;
@@ -211,4 +213,16 @@ fn image_norm(image: &[u8], out: &mut [f32]) {
         .iter_mut()
         .zip(image.iter().map(|&v| v as f32 / 255.)) 
         .for_each(|(o, i)| *o = i);
+}
+
+fn argmax(output: &[f32]) -> usize {
+    let mut max = 0.;
+    let mut max_idx = 0;
+    for (idx, &entry) in output.iter().enumerate() {
+        if entry > max {
+            max_idx = idx;
+            max = entry;
+        }
+    }
+    max_idx
 }
