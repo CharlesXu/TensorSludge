@@ -110,7 +110,7 @@ fn main() -> Result<()> {
             left_transpose: true,
             right_transpose: false,
         },
-        //Operation::ScalarMultiply(grad_l2, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l2, learning_rate), // Gradient update for layer 2
         Operation::InplaceSub(weights_l2, grad_l2),
         Operation::SigmoidDerivative(activations_l1), // More error propagation
         Operation::InplaceMultiply(error_l1, activations_l1),
@@ -129,7 +129,7 @@ fn main() -> Result<()> {
             left_transpose: true,
             right_transpose: false,
         },
-        //Operation::ScalarMultiply(grad_l1, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l1, learning_rate), // Gradient update for layer 2
         Operation::InplaceSub(weights_l1, grad_l1),
         Operation::SigmoidDerivative(activations_l0), // More error propagation
         Operation::InplaceMultiply(error_l0, activations_l0),
@@ -141,7 +141,7 @@ fn main() -> Result<()> {
             left_transpose: false,
             right_transpose: true,
         },
-        //Operation::ScalarMultiply(grad_l0, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l0, learning_rate), // Gradient update for layer 2
         Operation::InplaceSub(weights_l0, grad_l0),
     ];
     let backward_pass = ts.create_pass(&backward_pass)?;
@@ -166,7 +166,6 @@ fn main() -> Result<()> {
         ts.write(input_layer, &input_buf)?;
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
-        dbg!(&output_buf);
 
         // Difference with train val 
         output_buf[*label as usize] -= 1.;
@@ -181,7 +180,6 @@ fn main() -> Result<()> {
         ts.write(output_error_layer, &output_buf)?;
         ts.flow(backward_pass)?;
         ts.read(grad_l0, &mut tmp_out)?;
-        dbg!(&tmp_out);
     }
 
     Ok(())
