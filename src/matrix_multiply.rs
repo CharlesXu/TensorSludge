@@ -1,9 +1,12 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
 use crate::engine::SharedCore;
 use crate::matrix::Matrix;
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, ensure};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
+
+const LOCAL_SIZE_X: u32 = 16;
+const LOCAL_SIZE_Y: u32 = 16;
 
 pub struct MatrixMultiply {
     pipeline: vk::Pipeline,
@@ -16,8 +19,11 @@ pub struct MatrixMultiply {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
-    invocations_x: u32,
-    invocations_y: u32,
+    out_rows: u32, // Rows of in_a, product
+    out_cols: u32, // Columns of in_b, product
+    inner_rc: u32, // Columns of in_a, Rows of in_B
+    a_transpose: bool,
+    b_transpose: bool,
     pipeline: vk::Pipeline,
 }
 
@@ -117,41 +123,75 @@ impl MatrixMultiply {
         b_transpose: bool,
         dst: &Matrix,
     ) -> Result<Invocation> {
-        /*
-        let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
             self.core.device.update_descriptor_sets(
-                &[vk::WriteDescriptorSetBuilder::new()
-                    .dst_set(descriptor_set)
-                    .dst_binding(0)
-                    .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                    .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                        .buffer(*allocation.object())
-                        .offset(0)
-                        .range(vk::WHOLE_SIZE)])],
+                &[
+                vk::WriteDescriptorSetBuilder::new()
+                .dst_set(descriptor_set)
+                .dst_binding(1)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                    .buffer(*a.allocation().object())
+                    .offset(0)
+                    .range(vk::WHOLE_SIZE)]),
+                vk::WriteDescriptorSetBuilder::new()
+                .dst_set(descriptor_set)
+                .dst_binding(2)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                    .buffer(*b.allocation().object())
+                    .offset(0)
+                    .range(vk::WHOLE_SIZE)]),
+                vk::WriteDescriptorSetBuilder::new()
+                .dst_set(descriptor_set)
+                .dst_binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                    .buffer(*dst.allocation().object())
+                    .offset(0)
+                    .range(vk::WHOLE_SIZE)])
+                ],
                 &[],
             )
         };
 
-        let invocations_x = ((matrix.rows() / 16) + 1) as u32;
-        let invocations_y = ((matrix.cols() / 16) + 1) as u32;
+        ensure!(a.cols() == b.rows(), "Matrix dimensions invalid for multiplication");
+
 
         Ok(Invocation {
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
-            invocations_x,
-            invocations_y,
+            a_transpose,
+            b_transpose,
+            out_rows: a.rows() as u32,
+            out_cols: b.cols() as u32,
+            inner_rc: a.cols() as u32,
         })
-        */
-        todo!()
     }
 }
 
 impl crate::engine::Invocation for Invocation {
     fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
         unsafe {
+            let constants = [
+                self.out_rows,
+                self.out_cols,
+                self.inner_rc,
+                if self.a_transpose { 1 } else { 0 },
+                if self.b_transpose { 1 } else { 0 },
+            ];
+            let constants: &[u8] = bytemuck::cast_slice(&constants[..]);
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                constants.len() as u32,
+                constants.as_ptr() as _,
+            );
+
             device.cmd_bind_descriptor_sets(
                 command_buffer,
                 vk::PipelineBindPoint::COMPUTE,
@@ -167,7 +207,10 @@ impl crate::engine::Invocation for Invocation {
                 self.pipeline,
             );
 
-            device.cmd_dispatch(command_buffer, self.invocations_x, self.invocations_y, 1);
+            let invocations_x = (self.out_cols as u32 / LOCAL_SIZE_X) + 1;
+            let invocations_y = (self.out_rows as u32 / LOCAL_SIZE_Y) + 1;
+
+            device.cmd_dispatch(command_buffer, invocations_x, invocations_y, 1);
         }
     }
 }

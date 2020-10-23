@@ -51,9 +51,9 @@ fn matrix_multiply() -> Result<()> {
     }])?;
 
     // Identity matrix
-    let mut data = vec![0.; ROWS * COLS];
-    for row in 0..ROWS {
-        data[row * COLS + row] = 1.;
+    let mut data = vec![0.; ROWS * INNER];
+    for row in 0..INNER {
+        data[row * INNER + row] = 1.;
     }
     ts.write(a, &data)?;
 
