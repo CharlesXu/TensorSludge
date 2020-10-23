@@ -28,6 +28,7 @@ fn mse(input: &[f32]) -> f32 {
 /* Wishlist:
  * Sigmoid deriv
  * Elementwise mul
+ * Elementwise add
  */
 
 fn main() -> Result<()> {
@@ -43,12 +44,21 @@ fn main() -> Result<()> {
 
     // Build weight and activation buffers 
     let input_layer = ts.matrix(IMG_SIZE, 1)?;
+
     let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE)?;
     let activations_l0 = ts.matrix(HIDDEN_L1, 1)?;
+    let grad_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE)?;
+    let error_l0 = ts.matrix(HIDDEN_L1, 1)?;
+
     let weights_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1)?;
     let activations_l1 = ts.matrix(HIDDEN_L2, 1)?;
+    let grad_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1)?;
+    let error_l1 = ts.matrix(HIDDEN_L2, 1)?;
+
     let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
     let output_layer = ts.matrix(OUTPUT_SIZE, 1)?;
+    let grad_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
+    let output_error_layer = ts.matrix(HIDDEN_L2, 1)?;
 
     // Weight initialization
     let mut rng = rand::thread_rng();
@@ -83,9 +93,41 @@ fn main() -> Result<()> {
     ];
     let forward_pass = ts.create_pass(&forward_pass)?;
 
+    let backward_pass = vec![ // The boof
+        Operation::MatrixMultiply {
+            left: output_error_layer, // 
+            right: activations_l1,
+            dst: error_l1,
+            left_transpose: false,
+            right_transpose: true,
+        },
+        Operation::MatrixMultiply {
+            left: activations_l1, // 
+            right: activations_l0,
+            dst: error_l0,
+            left_transpose: false,
+            right_transpose: true,
+        },
+        /*Operation::ElemMultiply {
+            first: error_l1,
+            second:
+        },
+        Operation::MatrixMultiply {
+            left: weights_l1,
+            right: error_l1,
+            dst: grad_l1,
+            left_transpose: true,
+            right_transpose: false,
+        },
+        */
+    ];
+    let backward_pass = ts.create_pass(&backward_pass)?;
+
     // Intermediate, re-used buffers
     let mut input_buf = vec![0.; IMG_SIZE];
     let mut output_buf = vec![0.; OUTPUT_SIZE];
+
+    let mut tmp_out = vec![0.; HIDDEN_L1];
 
     // Training loop
     for (label, img) in mnist
@@ -110,6 +152,12 @@ fn main() -> Result<()> {
 
         // Softmax before backprop step
         softmax(&mut output_buf);
+
+        // Write to output error for backprop
+        ts.write(output_error_layer, &output_buf)?;
+        ts.flow(backward_pass)?;
+        ts.read(error_l0, &mut tmp_out)?;
+        dbg!(&tmp_out);
     }
 
     Ok(())
