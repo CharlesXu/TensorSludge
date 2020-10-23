@@ -13,3 +13,4 @@ bytemuck = "1.4"
 [dev-dependencies]
 mnist = { version = "0.4", features = ["download"] }
 rand = "0.7"
+png = "0.16"
