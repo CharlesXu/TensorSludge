@@ -150,19 +150,15 @@ fn main() -> Result<()> {
     let mut input_buf = vec![0.; IMG_SIZE];
     let mut output_buf = vec![0.; OUTPUT_SIZE];
 
-    let mut tmp_out = vec![0.; HIDDEN_L1 * IMG_SIZE];
-
     // Training loop
     for (label, img) in mnist
         .trn_lbl
         .iter()
         .zip(mnist.trn_img.chunks_exact(IMG_SIZE))
     {
+
         // Feed forward
-        input_buf
-            .iter_mut()
-            .zip(img.iter().map(|&v| v as f32 / 255.)) // Image normalization
-            .for_each(|(o, i)| *o = i);
+        image_norm(img, &mut input_buf);
         ts.write(input_layer, &input_buf)?;
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
@@ -170,8 +166,8 @@ fn main() -> Result<()> {
         // Difference with train val 
         output_buf[*label as usize] -= 1.;
 
-        let mse = mse(&output_buf);
-        println!("Mean squared error: {}", mse);
+        //let mse = mse(&output_buf);
+        //println!("Mean squared error: {}", mse);
 
         // Softmax before backprop step
         softmax(&mut output_buf);
@@ -179,8 +175,40 @@ fn main() -> Result<()> {
         // Write to output error for backprop
         ts.write(output_error_layer, &output_buf)?;
         ts.flow(backward_pass)?;
-        ts.read(grad_l0, &mut tmp_out)?;
     }
 
+    println!("Computing accuracy...");
+    let mut num_correct = 0;
+    let mut num_total = 0;
+    for (label, img) in mnist.tst_lbl.iter().zip(mnist.tst_img.chunks_exact(IMG_SIZE)) {
+        image_norm(img, &mut input_buf);
+        ts.write(input_layer, &input_buf)?;
+        ts.flow(forward_pass)?;
+        ts.read(output_layer, &mut output_buf)?;
+
+        let mut max = 0.;
+        let mut max_idx = 0;
+        for (idx, &entry) in output_buf.iter().enumerate() {
+            if entry > max {
+                max_idx = idx;
+                max = entry;
+            }
+        }
+
+        if max_idx == *label as usize {
+            num_correct += 1;
+        }
+        num_total += 1;
+    }
+
+    println!("Accuracy: {}", num_correct as f32 / num_total as f32);
+
     Ok(())
+}
+
+fn image_norm(image: &[u8], out: &mut [f32]) {
+    out
+        .iter_mut()
+        .zip(image.iter().map(|&v| v as f32 / 255.)) 
+        .for_each(|(o, i)| *o = i);
 }
