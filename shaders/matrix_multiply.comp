@@ -23,13 +23,59 @@ layout(push_constant) uniform Sizes {
 
 uvec2 gid = gl_GlobalInvocationID.xy;
 
+float matmul();
+float matmul_aT();
+float matmul_bT();
+float matmul_aTbT();
+
 void main() {
     if (gid.x >= out_cols || gid.y >= out_rows) return;
     uint output_idx = gid.y * out_cols + gid.x;
+    if (bool(transpose_a)) {
+        if (bool(transpose_b)) {
+            product[output_idx] = matmul_aTbT();
+        } else {
+            product[output_idx] = matmul_aT();
+        }
+    } else {
+        if (bool(transpose_b)) {
+            product[output_idx] = matmul_bT();
+        } else {
+            product[output_idx] = matmul();
+        }
+    }
+}
+
+float matmul() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
         sum += in_a[gid.y * inner_rc + i] * in_b[i * out_cols + gid.x];
     }
-    product[output_idx] = sum;
+    return sum;
 }
+
+float matmul_aT() {
+    float sum = 0.;
+    for (uint i = 0; i < inner_rc; i++) {
+        sum += in_a[gid.y + inner_rc * i] * in_b[i * out_cols + gid.x];
+    }
+    return sum;
+}
+
+float matmul_bT() {
+    float sum = 0.;
+    for (uint i = 0; i < inner_rc; i++) {
+        sum += in_a[gid.y * inner_rc + i] * in_b[i + out_cols * gid.x];
+    }
+    return sum;
+}
+
+float matmul_aTbT() {
+    float sum = 0.;
+    for (uint i = 0; i < inner_rc; i++) {
+        sum += in_a[gid.y + inner_rc * i] * in_b[i + out_cols * gid.x];
+    }
+    return sum;
+}
+
 

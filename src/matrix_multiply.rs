@@ -156,8 +156,13 @@ impl MatrixMultiply {
             )
         };
 
-        ensure!(a.cols() == b.rows(), "Matrix dimensions invalid for multiplication");
-
+        let invalid_msg = "Matrix dimensions invalid for multiplication";
+        match (a_transpose, b_transpose) {
+            (false, false) => ensure!(a.cols() == b.rows(), invalid_msg),
+            (true, false) => ensure!(a.rows() == b.rows(), invalid_msg),
+            (false, true) => ensure!(a.cols() == b.cols(), invalid_msg),
+            (true, true) => ensure!(a.rows() == b.cols(), invalid_msg),
+        }
 
         Ok(Invocation {
             pipeline: self.pipeline,

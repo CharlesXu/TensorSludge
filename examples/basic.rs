@@ -12,10 +12,11 @@ fn main() -> Result<()> {
         Operation::MatrixMultiply {
             left: a,
             right: b,
-            left_transpose: false,
-            right_transpose: true,
+            left_transpose: true,
+            right_transpose: false,
             dst,
         },
+        //Operation::Sigmoid(dst),
     ])?;
 
     ts.write(
@@ -30,9 +31,9 @@ fn main() -> Result<()> {
     ts.write(
         b,
         &[
-            10., //
-            11., //
-            12., //
+            0.1, //
+            0.2, //
+            0.3, //
         ],
     )?;
 
