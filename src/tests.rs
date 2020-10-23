@@ -7,7 +7,7 @@ fn sigmoid() -> Result<()> {
 
     let pass = ts.create_pass(&[Operation::Sigmoid(matrix)])?;
 
-    let data = (1..9).map(|v| v as f32).into_iter().collect::<Vec<_>>();
+    let data = (1..=9).map(|v| v as f32).into_iter().collect::<Vec<_>>();
 
     ts.write(matrix, &data)?;
 

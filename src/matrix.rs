@@ -1,5 +1,5 @@
 use crate::engine::SharedCore;
-use anyhow::Result;
+use anyhow::{Result, bail};
 use erupt::{
     utils::allocator::{Allocation, MappedMemory, MemoryTypeFinder},
     vk1_0 as vk,
@@ -56,6 +56,11 @@ impl Matrix {
     }
 
     pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
+        dbg!(self.rows() * self.cols());
+        dbg!(buf.len());
+        if self.rows() * self.cols() != buf.len() {
+            bail!("Mismatched buffer sizes");
+        }
         let mapping = self.map()?;
         buf.copy_from_slice(bytemuck::cast_slice(mapping.read()));
         mapping.unmap(&self.core.device).result()?;
@@ -63,6 +68,11 @@ impl Matrix {
     }
 
     pub fn write(&mut self, buf: &[f32]) -> Result<()> {
+        dbg!(self.rows() * self.cols());
+        dbg!(buf.len());
+        if self.rows() * self.cols() != buf.len() {
+            bail!("Mismatched buffer sizes");
+        }
         let mut mapping = self.map()?;
         mapping.import(bytemuck::cast_slice(buf));
         mapping.unmap(&self.core.device).result()?;
