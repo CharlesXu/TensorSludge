@@ -26,6 +26,10 @@ uvec2 gid = gl_GlobalInvocationID.xy;
 void main() {
     if (gid.x >= out_cols || gid.y >= out_rows) return;
     uint output_idx = gid.y * out_cols + gid.x;
-    product[output_idx] = 1337.;
+    float sum = 0.;
+    for (uint i = 0; i < inner_rc; i++) {
+        sum += in_a[gid.y * inner_rc + i] * in_b[i * out_cols + gid.x];
+    }
+    product[output_idx] = sum;
 }
 
