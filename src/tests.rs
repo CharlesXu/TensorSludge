@@ -57,8 +57,8 @@ fn matrix_multiply() -> Result<()> {
     }
     ts.write(a, &data)?;
 
-    let data = (1..=ROWS * COLS).map(|v| v as f32).into_iter().collect::<Vec<_>>();
-    ts.write(a, &data)?;
+    let data = (1..=INNER * COLS).map(|v| v as f32).into_iter().collect::<Vec<_>>();
+    ts.write(b, &data)?;
 
     ts.flow(pass)?;
 

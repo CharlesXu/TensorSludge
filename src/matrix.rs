@@ -56,8 +56,6 @@ impl Matrix {
     }
 
     pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
-        dbg!(self.rows() * self.cols());
-        dbg!(buf.len());
         if self.rows() * self.cols() != buf.len() {
             bail!("Mismatched buffer sizes");
         }
@@ -68,8 +66,6 @@ impl Matrix {
     }
 
     pub fn write(&mut self, buf: &[f32]) -> Result<()> {
-        dbg!(self.rows() * self.cols());
-        dbg!(buf.len());
         if self.rows() * self.cols() != buf.len() {
             bail!("Mismatched buffer sizes");
         }
