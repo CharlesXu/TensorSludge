@@ -93,33 +93,56 @@ fn main() -> Result<()> {
     ];
     let forward_pass = ts.create_pass(&forward_pass)?;
 
+    let learning_rate = 0.005;
+
     let backward_pass = vec![ // The reverse boof
-        Operation::MatrixMultiply {
+        Operation::MatrixMultiply { // Compute gradient for weights in layer 2 (outer product)
             left: output_error_layer, // 
             right: activations_l1,
+            dst: grad_l2,
+            left_transpose: false,
+            right_transpose: true,
+        },
+        Operation::MatrixMultiply { // Compute errors for next layer
+            left: weights_l2,
+            right: output_error_layer,
             dst: error_l1,
-            left_transpose: false,
-            right_transpose: true,
-        },
-        Operation::MatrixMultiply {
-            left: activations_l1, // 
-            right: activations_l0,
-            dst: error_l0,
-            left_transpose: false,
-            right_transpose: true,
-        },
-        /*Operation::ElemMultiply {
-            first: error_l1,
-            second:
-        },
-        Operation::MatrixMultiply {
-            left: weights_l1,
-            right: error_l1,
-            dst: grad_l1,
             left_transpose: true,
             right_transpose: false,
         },
-        */
+        //Operation::ScalarMultiply(grad_l2, learning_rate), // Gradient update for layer 2
+        Operation::InplaceSub(weights_l2, grad_l2),
+        Operation::SigmoidDerivative(activations_l1), // More error propagation
+        Operation::InplaceMultiply(error_l1, activations_l1),
+        //
+        Operation::MatrixMultiply { // Compute gradient for weights in layer 1 (outer product)
+            left: error_l1, // 
+            right: activations_l0,
+            dst: grad_l1,
+            left_transpose: false,
+            right_transpose: true,
+        },
+        Operation::MatrixMultiply { // Compute errors for next layer
+            left: weights_l1,
+            right: error_l1,
+            dst: error_l0,
+            left_transpose: true,
+            right_transpose: false,
+        },
+        //Operation::ScalarMultiply(grad_l1, learning_rate), // Gradient update for layer 2
+        Operation::InplaceSub(weights_l1, grad_l1),
+        Operation::SigmoidDerivative(activations_l0), // More error propagation
+        Operation::InplaceMultiply(error_l0, activations_l0),
+        //
+        Operation::MatrixMultiply { // Compute gradient for weights in layer 1 (outer product)
+            left: error_l0, // 
+            right: input_layer,
+            dst: grad_l0,
+            left_transpose: false,
+            right_transpose: true,
+        },
+        //Operation::ScalarMultiply(grad_l0, learning_rate), // Gradient update for layer 2
+        Operation::InplaceSub(weights_l0, grad_l0),
     ];
     let backward_pass = ts.create_pass(&backward_pass)?;
 
@@ -127,7 +150,7 @@ fn main() -> Result<()> {
     let mut input_buf = vec![0.; IMG_SIZE];
     let mut output_buf = vec![0.; OUTPUT_SIZE];
 
-    let mut tmp_out = vec![0.; HIDDEN_L1];
+    let mut tmp_out = vec![0.; HIDDEN_L2 * OUTPUT_SIZE];
 
     // Training loop
     for (label, img) in mnist
@@ -157,7 +180,7 @@ fn main() -> Result<()> {
         // Write to output error for backprop
         ts.write(output_error_layer, &output_buf)?;
         ts.flow(backward_pass)?;
-        ts.read(error_l0, &mut tmp_out)?;
+        ts.read(grad_l2, &mut tmp_out)?;
         dbg!(&tmp_out);
     }
 

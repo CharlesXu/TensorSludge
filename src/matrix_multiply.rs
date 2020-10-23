@@ -1,7 +1,7 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
 use crate::engine::SharedCore;
 use crate::matrix::Matrix;
-use anyhow::{Context, Result, ensure};
+use anyhow::{ensure, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
 
@@ -19,8 +19,8 @@ pub struct MatrixMultiply {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
-    a_cols: u32, // Number of cols in a
-    b_cols: u32, // Number of cols in b
+    a_cols: u32,   // Number of cols in a
+    b_cols: u32,   // Number of cols in b
     out_rows: u32, // Rows of in_a, product
     out_cols: u32, // Columns of in_b, product
     inner_rc: u32, // Columns of in_a, Rows of in_B
@@ -34,20 +34,20 @@ impl MatrixMultiply {
         // Layout:
         let bindings = [
             vk::DescriptorSetLayoutBindingBuilder::new()
-            .binding(0)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+                .binding(0)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::COMPUTE),
             vk::DescriptorSetLayoutBindingBuilder::new()
-            .binding(1)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+                .binding(1)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::COMPUTE),
             vk::DescriptorSetLayoutBindingBuilder::new()
-            .binding(2)
-            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-            .descriptor_count(1)
-            .stage_flags(vk::ShaderStageFlags::COMPUTE),
+                .binding(2)
+                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                .descriptor_count(1)
+                .stage_flags(vk::ShaderStageFlags::COMPUTE),
         ];
 
         let create_info = vk::DescriptorSetLayoutCreateInfoBuilder::new().bindings(&bindings);
@@ -73,8 +73,7 @@ impl MatrixMultiply {
             .size(std::mem::size_of::<[u32; 7]>() as u32)];
 
         let descriptor_set_layouts = [descriptor_set_layout];
-        let create_info =
-            vk::PipelineLayoutCreateInfoBuilder::new()
+        let create_info = vk::PipelineLayoutCreateInfoBuilder::new()
             .set_layouts(&descriptor_set_layouts)
             .push_constant_ranges(&push_constant_ranges);
         let pipeline_layout =
@@ -129,30 +128,30 @@ impl MatrixMultiply {
         unsafe {
             self.core.device.update_descriptor_sets(
                 &[
-                vk::WriteDescriptorSetBuilder::new()
-                .dst_set(descriptor_set)
-                .dst_binding(0)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                    .buffer(*a.allocation().object())
-                    .offset(0)
-                    .range(vk::WHOLE_SIZE)]),
-                vk::WriteDescriptorSetBuilder::new()
-                .dst_set(descriptor_set)
-                .dst_binding(1)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                    .buffer(*b.allocation().object())
-                    .offset(0)
-                    .range(vk::WHOLE_SIZE)]),
-                vk::WriteDescriptorSetBuilder::new()
-                .dst_set(descriptor_set)
-                .dst_binding(2)
-                .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
-                .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                    .buffer(*dst.allocation().object())
-                    .offset(0)
-                    .range(vk::WHOLE_SIZE)])
+                    vk::WriteDescriptorSetBuilder::new()
+                        .dst_set(descriptor_set)
+                        .dst_binding(0)
+                        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                        .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                            .buffer(*a.allocation().object())
+                            .offset(0)
+                            .range(vk::WHOLE_SIZE)]),
+                    vk::WriteDescriptorSetBuilder::new()
+                        .dst_set(descriptor_set)
+                        .dst_binding(1)
+                        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                        .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                            .buffer(*b.allocation().object())
+                            .offset(0)
+                            .range(vk::WHOLE_SIZE)]),
+                    vk::WriteDescriptorSetBuilder::new()
+                        .dst_set(descriptor_set)
+                        .dst_binding(2)
+                        .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                        .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                            .buffer(*dst.allocation().object())
+                            .offset(0)
+                            .range(vk::WHOLE_SIZE)]),
                 ],
                 &[],
             )
@@ -166,23 +165,17 @@ impl MatrixMultiply {
             (true, true) => ensure!(a.rows() == b.cols(), invalid_msg),
         }
 
-        let inner_rc = if b_transpose {
-            b.cols()
-        } else {
-            b.rows()
-        } as u32;
+        let inner_rc = if b_transpose { b.cols() } else { b.rows() } as u32;
 
-        let out_rows = if a_transpose {
-            a.cols()
-        } else {
-            a.rows()
-        } as u32;
+        let out_rows = if a_transpose { a.cols() } else { a.rows() } as u32;
 
-        let out_cols = if b_transpose {
-            b.rows()
-        } else {
-            b.cols()
-        } as u32;
+        let out_cols = if b_transpose { b.rows() } else { b.cols() } as u32;
+
+        let invalid_msg = "Output matrix dimensions invalid for input sizes in multiplication";
+        ensure!(
+            dst.cols() as u32 == out_cols && dst.rows() as u32 == out_rows,
+            invalid_msg
+        );
 
         Ok(Invocation {
             a_cols: a.cols() as u32,
