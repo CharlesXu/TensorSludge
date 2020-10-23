@@ -176,11 +176,14 @@ impl TensorSludge {
         let mut dispatch_list: Vec<(Box<dyn Invocation>, Vec<BufferAction>)> = Vec::new();
         for op in ops {
             match op {
-                Operation::Sigmoid(mat) => {
+                Operation::Sigmoid(mat) | Operation::SigmoidDerivative(mat) => {
                     required_mats.push(mat.0);
-                    let invocation = self
-                        .sigmoid
-                        .invoke(self.matrices.get(mat.0).context("Matrix was deleted")?)?;
+                    let matrix = self.matrices.get(mat.0).context("Matrix was deleted")?;
+                    let invocation = match op {
+                        Operation::Sigmoid(_) => self.sigmoid.invoke(matrix),
+                        Operation::SigmoidDerivative(_) => self.sigmoid.invoke_deriv(matrix),
+                        _ => unreachable!(),
+                    }?;
                     let actions = vec![BufferAction {
                         matrix: mat.0,
                         read: true,
@@ -263,7 +266,6 @@ impl TensorSludge {
                     ];
                     dispatch_list.push((Box::new(invocation), actions));
                 }
-                _ => todo!("Some ops not implemented"),
             }
         }
 

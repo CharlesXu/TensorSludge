@@ -32,10 +32,10 @@ pub enum Operation {
     },
     /// Set all values of this matrix to the sigmoid of their current value
     Sigmoid(Matrix),
-    // /// Set all values of this matrix to the sigmoid derivative of their current value; Note that
-    // /// this function expects the matrix in question to already have been passed through
-    // /// Sigmoid().
-    // SigmoidDerivative(Matrix),
+    /// Set all values of this matrix to the sigmoid derivative of their current value; Note that
+    /// this function expects the matrix in question to already have been passed through
+    /// Sigmoid().
+    SigmoidDerivative(Matrix),
     /// Performs the elementwise equivalent of `+=`
     InplaceAdd(Matrix, Matrix),
     /// Performs the elementwise equivalent of `-=`

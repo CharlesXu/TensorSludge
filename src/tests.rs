@@ -1,5 +1,6 @@
-use anyhow::Result;
 use crate::*;
+use anyhow::Result;
+use std::f32::EPSILON;
 
 #[cfg(test)]
 #[test]
@@ -28,7 +29,39 @@ fn sigmoid() -> Result<()> {
         .iter()
         .map(|v| 1. / (1. + (-v).exp()))
         .zip(output.iter())
-        .all(|(a, &b)| (a - b).abs() < std::f32::EPSILON));
+        .all(|(a, &b)| (a - b).abs() < EPSILON));
+
+    Ok(())
+}
+
+#[cfg(test)]
+#[test]
+fn sigmoid_deriv() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    const ROWS: usize = 300;
+    const COLS: usize = 300;
+
+    let matrix = ts.matrix(ROWS, COLS)?;
+
+    let pass = ts.create_pass(&[Operation::SigmoidDerivative(matrix)])?;
+
+    let data = (1..=ROWS * COLS)
+        .map(|v| v as f32)
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    ts.write(matrix, &data)?;
+
+    ts.flow(pass)?;
+
+    let mut output = [0.; ROWS * COLS];
+    ts.read(matrix, &mut output)?;
+
+    assert!(data
+        .iter()
+        .map(|v| v * (1. - v))
+        .zip(output.iter())
+        .all(|(a, &b)| (a - b).abs() < EPSILON));
 
     Ok(())
 }
@@ -73,7 +106,7 @@ fn matrix_multiply() -> Result<()> {
     assert!(data
         .iter()
         .zip(out_vec.iter())
-        .all(|(a, &b)| (a - b).abs() < std::f32::EPSILON));
+        .all(|(a, &b)| (a - b).abs() < EPSILON));
 
     Ok(())
 }
@@ -206,12 +239,12 @@ fn elementwise_ops() -> Result<()> {
     let mut output = [0.; ROWS * COLS];
     ts.read(a, &mut output)?;
 
-    assert!(a_data.iter().zip(b_data.iter())
+    assert!(a_data
+        .iter()
+        .zip(b_data.iter())
         .map(|(a, b)| (a + b) * b - b)
         .zip(output.iter())
-        .all(|(a, &b)| (a - b).abs() < std::f32::EPSILON));
+        .all(|(a, &b)| (a - b).abs() < EPSILON));
 
     Ok(())
 }
-
-
