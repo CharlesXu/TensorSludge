@@ -1,3 +1,4 @@
+use crate::elem_arithmetic::ElementwiseArithmetic;
 use crate::matrix::Matrix;
 use crate::matrix_multiply::MatrixMultiply;
 use crate::sigmoid::Sigmoid;
@@ -25,6 +26,7 @@ pub struct TensorSludge {
     core: SharedCore,
     sigmoid: Sigmoid,
     matrix_multiply: MatrixMultiply,
+    elem_arithmetic: ElementwiseArithmetic,
     queue: vk::Queue,
 }
 
@@ -113,10 +115,12 @@ impl TensorSludge {
 
         let sigmoid = Sigmoid::new(core.clone())?;
         let matrix_multiply = MatrixMultiply::new(core.clone())?;
+        let elem_arithmetic = ElementwiseArithmetic::new(core.clone())?;
 
         Ok(Self {
             command_pool,
             matrix_multiply,
+            elem_arithmetic,
             matrices: GenMap::with_capacity(10),
             passes: GenMap::with_capacity(10),
             sigmoid,
@@ -182,6 +186,39 @@ impl TensorSludge {
                         read: true,
                         write: true,
                     }];
+                    dispatch_list.push((Box::new(invocation), actions));
+                }
+                Operation::InplaceAdd(product, scalars)
+                | Operation::InplaceMultiply(product, scalars) => {
+                    required_mats.push(product.0);
+                    required_mats.push(scalars.0);
+                    let p = self
+                        .matrices
+                        .get(product.0)
+                        .context("Product matrix was deleted")?;
+                    let s = self
+                        .matrices
+                        .get(scalars.0)
+                        .context("Scalars matrix was deleted")?;
+                    let invocation = match op {
+                        Operation::InplaceMultiply(_, _) => {
+                            self.elem_arithmetic.invoke_mult(p, s)?
+                        }
+                        Operation::InplaceAdd(_, _) => self.elem_arithmetic.invoke_add(p, s)?,
+                        _ => unreachable!(),
+                    };
+                    let actions = vec![
+                        BufferAction {
+                            matrix: product.0,
+                            read: true,
+                            write: true,
+                        },
+                        BufferAction {
+                            matrix: scalars.0,
+                            read: true,
+                            write: false,
+                        },
+                    ];
                     dispatch_list.push((Box::new(invocation), actions));
                 }
                 Operation::MatrixMultiply {

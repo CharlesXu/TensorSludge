@@ -1,0 +1,16 @@
+#version 450
+layout (local_size_x = 16) in;
+
+layout(binding = 0) buffer Product {
+    float product[];
+};
+
+layout(binding = 1) readonly buffer Scalars {
+    float scalars[];
+};
+
+void main() {
+    uint gid = gl_GlobalInvocationID.x;
+    if (gid > product.length()) return;
+    product[gid] *= scalars[gid];
+}

@@ -170,3 +170,46 @@ fn matrix_multiply_transposes() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[test]
+fn elementwise_ops() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    const ROWS: usize = 300;
+    const COLS: usize = 100;
+
+    let a = ts.matrix(ROWS, COLS)?;
+    let b = ts.matrix(ROWS, COLS)?;
+
+    let pass = ts.create_pass(&[
+        Operation::InplaceAdd(a, b),
+        Operation::InplaceMultiply(a, b),
+    ])?;
+
+    let a_data = (1..=ROWS * COLS)
+        .map(|v| v as f32)
+        .into_iter()
+        .collect::<Vec<_>>();
+    ts.write(a, &a_data)?;
+
+    let b_data = (1..=ROWS * COLS)
+        .rev()
+        .map(|v| (v * v) as f32)
+        .into_iter()
+        .collect::<Vec<_>>();
+    ts.write(b, &b_data)?;
+
+    ts.flow(pass)?;
+
+    let mut output = [0.; ROWS * COLS];
+    ts.read(a, &mut output)?;
+
+    assert!(a_data.iter().zip(b_data.iter())
+        .map(|(a, b)| (a + b) * b)
+        .zip(output.iter())
+        .all(|(a, &b)| (a - b).abs() < std::f32::EPSILON));
+
+    Ok(())
+}
+
+
