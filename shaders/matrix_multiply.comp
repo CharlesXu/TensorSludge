@@ -77,5 +77,3 @@ float matmul_aTbT() {
     }
     return sum;
 }
-
-

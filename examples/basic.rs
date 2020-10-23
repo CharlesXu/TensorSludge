@@ -43,6 +43,5 @@ fn main() -> Result<()> {
     ts.read(dst, &mut output)?;
     dbg!(output);
 
-
     Ok(())
 }
