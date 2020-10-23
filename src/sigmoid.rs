@@ -16,10 +16,12 @@ pub struct Sigmoid {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
-    invocations_x: u32,
-    invocations_y: u32,
+    invocations: u32,
     pipeline: vk::Pipeline,
 }
+
+const SHADER_SPV_PATH: &str = "shaders/sigmoid.comp.spv";
+const LOCAL_SIZE_X: u32 = 16;
 
 impl Sigmoid {
     pub fn new(core: SharedCore) -> Result<Self> {
@@ -40,7 +42,7 @@ impl Sigmoid {
 
         // Load shader
         let shader_spirv =
-            std::fs::read("shaders/sigmoid.comp.spv").context("Sigmoid shader failed to load")?;
+            std::fs::read(SHADER_SPV_PATH).context("Sigmoid shader failed to load")?;
         let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
         let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
         let shader_module =
@@ -104,15 +106,13 @@ impl Sigmoid {
             )
         };
 
-        let invocations_x = ((matrix.rows() / 16) + 1) as u32;
-        let invocations_y = ((matrix.cols() / 16) + 1) as u32;
+        let invocations = ((matrix.rows() * matrix.cols()) as u32 / LOCAL_SIZE_X) + 1;
 
         Ok(Invocation {
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
-            invocations_x,
-            invocations_y,
+            invocations,
         })
     }
 }
@@ -135,7 +135,7 @@ impl crate::engine::Invocation for Invocation {
                 self.pipeline,
             );
 
-            device.cmd_dispatch(command_buffer, self.invocations_x, self.invocations_y, 1);
+            device.cmd_dispatch(command_buffer, self.invocations, 1, 1);
         }
     }
 }

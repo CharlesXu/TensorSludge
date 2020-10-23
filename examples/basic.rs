@@ -20,7 +20,6 @@ fn main() -> Result<()> {
         */
         Operation::Sigmoid(b),
         Operation::Sigmoid(a),
-        Operation::Sigmoid(b),
     ])?;
 
     ts.write(

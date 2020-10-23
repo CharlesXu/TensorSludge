@@ -19,6 +19,7 @@
     * Allocate and write command buffers
 * Matrices:
     * Allow read/write, are created uninitialized..?
+    * Represented only as their linear row-major data, without size metadata. This is done so that operations like vkCmdFillBuffer can be used to clear only the data and now the rows/columns. Size metadata must be passed into compute shaders by uniforms or push constants.
 
 So on pass creation, we:
 * Create descriptor pool with exactly as many descriptor sets we need
