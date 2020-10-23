@@ -93,7 +93,7 @@ fn main() -> Result<()> {
     ];
     let forward_pass = ts.create_pass(&forward_pass)?;
 
-    let backward_pass = vec![ // The boof
+    let backward_pass = vec![ // The reverse boof
         Operation::MatrixMultiply {
             left: output_error_layer, // 
             right: activations_l1,

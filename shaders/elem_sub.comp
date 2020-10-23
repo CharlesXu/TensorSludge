@@ -11,6 +11,6 @@ layout(binding = 1) readonly buffer Scalars {
 
 void main() {
     uint gid = gl_GlobalInvocationID.x;
-    if (gid > product.length()) return;
+    if (gid >= product.length()) return;
     product[gid] -= scalars[gid];
 }
