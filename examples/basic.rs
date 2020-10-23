@@ -9,7 +9,6 @@ fn main() -> Result<()> {
     let dst = ts.matrix(3, 1)?;
 
     let pass = ts.create_pass(&[
-        /*
         Operation::MatrixMultiply {
             left: a,
             right: b,
@@ -17,9 +16,6 @@ fn main() -> Result<()> {
             right_transpose: true,
             dst,
         },
-        */
-        Operation::Sigmoid(b),
-        Operation::Sigmoid(a),
     ])?;
 
     ts.write(
@@ -42,20 +38,9 @@ fn main() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut output = [0.; 3 * 3];
-    ts.read(a, &mut output)?;
-    dbg!(output);
-
     let mut output = [0.; 3];
-    ts.read(b, &mut output)?;
+    ts.read(dst, &mut output)?;
     dbg!(output);
-    //ts.read(a, &mut output)?;
-
-    /*
-    assert!((output[0] - 68.) <= std::f32::EPSILON);
-    assert!((output[1] - 167.) <= std::f32::EPSILON);
-    assert!((output[2] - 266.) <= std::f32::EPSILON);
-    */
 
 
     Ok(())
