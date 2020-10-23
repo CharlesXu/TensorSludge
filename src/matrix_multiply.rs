@@ -19,6 +19,8 @@ pub struct MatrixMultiply {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
+    a_cols: u32, // Number of cols in a
+    b_cols: u32, // Number of cols in b
     out_rows: u32, // Rows of in_a, product
     out_cols: u32, // Columns of in_b, product
     inner_rc: u32, // Columns of in_a, Rows of in_B
@@ -68,7 +70,7 @@ impl MatrixMultiply {
         let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
             .stage_flags(vk::ShaderStageFlags::COMPUTE)
             .offset(0)
-            .size(std::mem::size_of::<[u32; 5]>() as u32)];
+            .size(std::mem::size_of::<[u32; 7]>() as u32)];
 
         let descriptor_set_layouts = [descriptor_set_layout];
         let create_info =
@@ -156,7 +158,7 @@ impl MatrixMultiply {
             )
         };
 
-        let invalid_msg = "Matrix dimensions invalid for multiplication";
+        let invalid_msg = "Input matrix dimensions invalid for multiplication";
         match (a_transpose, b_transpose) {
             (false, false) => ensure!(a.cols() == b.rows(), invalid_msg),
             (true, false) => ensure!(a.rows() == b.rows(), invalid_msg),
@@ -164,15 +166,35 @@ impl MatrixMultiply {
             (true, true) => ensure!(a.rows() == b.cols(), invalid_msg),
         }
 
+        let inner_rc = if b_transpose {
+            b.cols()
+        } else {
+            b.rows()
+        } as u32;
+
+        let out_rows = if a_transpose {
+            a.cols()
+        } else {
+            a.rows()
+        } as u32;
+
+        let out_cols = if b_transpose {
+            b.rows()
+        } else {
+            b.cols()
+        } as u32;
+
         Ok(Invocation {
+            a_cols: a.cols() as u32,
+            b_cols: b.cols() as u32,
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
             a_transpose,
             b_transpose,
-            out_rows: a.rows() as u32,
-            out_cols: b.cols() as u32,
-            inner_rc: a.cols() as u32,
+            out_rows,
+            out_cols,
+            inner_rc,
         })
     }
 }
@@ -181,6 +203,8 @@ impl crate::engine::Invocation for Invocation {
     fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
         unsafe {
             let constants = [
+                self.a_cols,
+                self.b_cols,
                 self.out_rows,
                 self.out_cols,
                 self.inner_rc,

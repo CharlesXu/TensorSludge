@@ -36,16 +36,15 @@ fn sigmoid() -> Result<()> {
 #[test]
 fn matrix_multiply() -> Result<()> {
     let mut ts = TensorSludge::new()?;
-    const ROWS: usize = 300;
-    const INNER: usize = 300;
-    const COLS: usize = 200;
+    const IDENT_SIZE: usize = 3;
+    const COLS: usize = 2;
 
-    let a = ts.matrix(ROWS, INNER)?;
-    let b = ts.matrix(INNER, COLS)?;
-    let output = ts.matrix(ROWS, COLS)?;
+    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE)?;
+    let b = ts.matrix(IDENT_SIZE, COLS)?;
+    let output = ts.matrix(IDENT_SIZE, COLS)?;
 
     let pass = ts.create_pass(&[Operation::MatrixMultiply {
-        left: a,
+        left: identity,
         right: b,
         dst: output,
         left_transpose: false,
@@ -53,13 +52,13 @@ fn matrix_multiply() -> Result<()> {
     }])?;
 
     // Identity matrix
-    let mut data = vec![0.; ROWS * INNER];
-    for row in 0..INNER {
-        data[row * INNER + row] = 1.;
+    let mut data = vec![0.; IDENT_SIZE * IDENT_SIZE];
+    for row in 0..IDENT_SIZE {
+        data[row * IDENT_SIZE + row] = 1.;
     }
-    ts.write(a, &data)?;
+    ts.write(identity, &data)?;
 
-    let data = (1..=INNER * COLS)
+    let data = (1..=IDENT_SIZE * COLS)
         .map(|v| v as f32)
         .into_iter()
         .collect::<Vec<_>>();
@@ -67,7 +66,7 @@ fn matrix_multiply() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut out_vec = vec![0.; ROWS * COLS];
+    let mut out_vec = vec![0.; IDENT_SIZE * COLS];
     ts.read(output, &mut out_vec)?;
 
     assert!(data

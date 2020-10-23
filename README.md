@@ -7,6 +7,7 @@
 ## TODO:
 * Allow naming of matrices for debugging!
     * String for name, with custom hash impl to only use handle hash
+* Tests for non-square matrix muls with transpose
 
 ## Implementation:
 * Per compute shader:

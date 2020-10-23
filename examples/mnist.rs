@@ -58,7 +58,7 @@ fn main() -> Result<()> {
     let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
     let output_layer = ts.matrix(OUTPUT_SIZE, 1)?;
     let grad_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
-    let output_error_layer = ts.matrix(HIDDEN_L2, 1)?;
+    let output_error_layer = ts.matrix(OUTPUT_SIZE, 1)?;
 
     // Weight initialization
     let mut rng = rand::thread_rng();
@@ -143,6 +143,7 @@ fn main() -> Result<()> {
         ts.write(input_layer, &input_buf)?;
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
+        dbg!(&output_buf);
 
         // Difference with train val 
         output_buf[*label as usize] -= 1.;

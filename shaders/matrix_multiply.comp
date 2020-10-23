@@ -14,6 +14,8 @@ layout(binding = 2) writeonly buffer Product {
 };
 
 layout(push_constant) uniform Sizes {
+    uint a_cols;
+    uint b_cols;
     uint out_rows; // Rows of in_a, product
     uint out_cols; // Columns of in_b, product
     uint inner_rc; /// Columns of in_a, Rows of in_B
@@ -49,7 +51,7 @@ void main() {
 float matmul() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * inner_rc + i] * in_b[i * out_cols + gid.x];
+        sum += in_a[gid.y * a_cols + i] * in_b[i * b_cols + gid.x];
     }
     return sum;
 }
@@ -57,7 +59,7 @@ float matmul() {
 float matmul_aT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + inner_rc * i] * in_b[i * out_cols + gid.x];
+        sum += in_a[gid.y + a_cols * i] * in_b[i * b_cols + gid.x];
     }
     return sum;
 }
@@ -65,7 +67,7 @@ float matmul_aT() {
 float matmul_bT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * inner_rc + i] * in_b[i + out_cols * gid.x];
+        sum += in_a[gid.y * a_cols + i] * in_b[i + b_cols * gid.x];
     }
     return sum;
 }
@@ -73,7 +75,7 @@ float matmul_bT() {
 float matmul_aTbT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + inner_rc * i] * in_b[i + out_cols * gid.x];
+        sum += in_a[gid.y + a_cols * i] * in_b[i + b_cols * gid.x];
     }
     return sum;
 }
