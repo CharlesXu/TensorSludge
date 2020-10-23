@@ -1,0 +1,31 @@
+#version 450
+layout (local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) readonly buffer InA {
+    float in_a[];
+};
+
+layout(binding = 1) readonly buffer InB {
+    float in_b[];
+};
+
+layout(binding = 2) writeonly buffer Product {
+    float product[];
+};
+
+layout(push_constant) uniform Sizes {
+    uint out_rows; // Rows of in_a, product
+    uint out_cols; // Columns of in_b, product
+    uint inner_rc; /// Columns of in_a, Rows of in_B
+    uint transpose_a; // Multiply as if in_a was transposed
+    uint transpose_b; // Multiply as if in_b was transposed
+};
+
+uvec2 gid = gl_GlobalInvocationID.xy;
+
+void main() {
+    if (gid.x >= out_cols || gid.y >= out_rows) return;
+    uint output_idx = gid.y * out_cols + gid.x;
+    product[output_idx] = 1337.;
+}
+

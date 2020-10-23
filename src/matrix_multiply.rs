@@ -1,0 +1,152 @@
+use crate::desc_set_allocator::DescriptorSetAllocator;
+use crate::engine::SharedCore;
+use crate::matrix::Matrix;
+use anyhow::{Context, Result};
+use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
+use std::ffi::CString;
+
+pub struct MatrixMultiply {
+    pipeline: vk::Pipeline,
+    pipeline_layout: vk::PipelineLayout,
+    descriptor_set_layout: vk::DescriptorSetLayout,
+    core: SharedCore,
+    ds_allocator: DescriptorSetAllocator,
+}
+
+pub struct Invocation {
+    descriptor_set: vk::DescriptorSet,
+    pipeline_layout: vk::PipelineLayout,
+    invocations_x: u32,
+    invocations_y: u32,
+    pipeline: vk::Pipeline,
+}
+
+impl MatrixMultiply {
+    pub fn new(core: SharedCore) -> Result<Self> {
+        // Layout:
+        let bindings = [vk::DescriptorSetLayoutBindingBuilder::new()
+            .binding(0)
+            .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)];
+
+        let create_info = vk::DescriptorSetLayoutCreateInfoBuilder::new().bindings(&bindings);
+
+        let descriptor_set_layout = unsafe {
+            core.device
+                .create_descriptor_set_layout(&create_info, None, None)
+        }
+        .result()?;
+
+        // Load shader
+        let shader_spirv =
+            std::fs::read("shaders/matrix_multiply.comp.spv").context("MatrixMultiply shader failed to load")?;
+        let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
+        let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
+        let shader_module =
+            unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
+
+        // Pipeline
+        let descriptor_set_layouts = [descriptor_set_layout];
+        let create_info =
+            vk::PipelineLayoutCreateInfoBuilder::new().set_layouts(&descriptor_set_layouts);
+        let pipeline_layout =
+            unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
+
+        let entry_point = CString::new("main")?;
+        let stage = vk::PipelineShaderStageCreateInfoBuilder::new()
+            .stage(vk::ShaderStageFlagBits::COMPUTE)
+            .module(shader_module)
+            .name(&entry_point)
+            .build();
+        let create_info = vk::ComputePipelineCreateInfoBuilder::new()
+            .stage(stage)
+            .layout(pipeline_layout);
+        let pipeline = unsafe {
+            core.device
+                .create_compute_pipelines(None, &[create_info], None)
+        }
+        .result()?[0];
+
+        unsafe {
+            core.device.destroy_shader_module(Some(shader_module), None);
+        }
+
+        // Create descriptor set allocator
+        let dpsbs = vec![vk::DescriptorPoolSizeBuilder::new()
+            ._type(vk::DescriptorType::STORAGE_BUFFER)
+            .descriptor_count(1)];
+        let ds_allocator = DescriptorSetAllocator::new(dpsbs, descriptor_set_layout, core.clone());
+
+        Ok(Self {
+            pipeline,
+            pipeline_layout,
+            descriptor_set_layout,
+            ds_allocator,
+            core,
+        })
+    }
+
+    pub fn invoke(&mut self, matrix: &Matrix) -> Result<Invocation> {
+        let allocation = matrix.allocation();
+        let descriptor_set = self.ds_allocator.pop()?;
+        unsafe {
+            self.core.device.update_descriptor_sets(
+                &[vk::WriteDescriptorSetBuilder::new()
+                    .dst_set(descriptor_set)
+                    .dst_binding(0)
+                    .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
+                    .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
+                        .buffer(*allocation.object())
+                        .offset(0)
+                        .range(vk::WHOLE_SIZE)])],
+                &[],
+            )
+        };
+
+        let invocations_x = ((matrix.rows() / 16) + 1) as u32;
+        let invocations_y = ((matrix.cols() / 16) + 1) as u32;
+
+        Ok(Invocation {
+            pipeline: self.pipeline,
+            pipeline_layout: self.pipeline_layout,
+            descriptor_set,
+            invocations_x,
+            invocations_y,
+        })
+    }
+}
+
+impl crate::engine::Invocation for Invocation {
+    fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
+        unsafe {
+            device.cmd_bind_descriptor_sets(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline_layout,
+                0,
+                &[self.descriptor_set],
+                &[],
+            );
+
+            device.cmd_bind_pipeline(
+                command_buffer,
+                vk::PipelineBindPoint::COMPUTE,
+                self.pipeline,
+            );
+
+            device.cmd_dispatch(command_buffer, self.invocations_x, self.invocations_y, 1);
+        }
+    }
+}
+
+impl Drop for MatrixMultiply {
+    fn drop(&mut self) {
+        unsafe {
+            self.core.device.destroy_pipeline(Some(self.pipeline), None);
+            self.core
+                .device
+                .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
+        }
+    }
+}
