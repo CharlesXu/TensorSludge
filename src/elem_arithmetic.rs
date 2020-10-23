@@ -8,6 +8,7 @@ use std::ffi::CString;
 pub struct ElementwiseArithmetic {
     mult_pipeline: vk::Pipeline,
     add_pipeline: vk::Pipeline,
+    sub_pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
@@ -23,6 +24,7 @@ pub struct Invocation {
 
 const MULT_SHADER_PATH: &str = "shaders/elem_mult.comp.spv";
 const ADD_SHADER_PATH: &str = "shaders/elem_add.comp.spv";
+const SUB_SHADER_PATH: &str = "shaders/elem_sub.comp.spv";
 const LOCAL_SIZE_X: u32 = 16;
 
 impl ElementwiseArithmetic {
@@ -64,6 +66,13 @@ impl ElementwiseArithmetic {
         let add_shader_module =
             unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
 
+        let shader_spirv =
+            std::fs::read(SUB_SHADER_PATH).context("Elementwise subtract shader failed to load")?;
+        let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
+        let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
+        let sub_shader_module =
+            unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
+
         // Pipelines
         let descriptor_set_layouts = [descriptor_set_layout];
         let create_info =
@@ -91,13 +100,23 @@ impl ElementwiseArithmetic {
             .stage(add_stage)
             .layout(pipeline_layout);
 
+        let sub_stage = vk::PipelineShaderStageCreateInfoBuilder::new()
+            .stage(vk::ShaderStageFlagBits::COMPUTE)
+            .module(sub_shader_module)
+            .name(&entry_point)
+            .build();
+        let sub_create_info = vk::ComputePipelineCreateInfoBuilder::new()
+            .stage(sub_stage)
+            .layout(pipeline_layout);
+
         let pipelines = unsafe {
             core.device
-                .create_compute_pipelines(None, &[mult_create_info, add_create_info], None)
+                .create_compute_pipelines(None, &[mult_create_info, add_create_info, sub_create_info], None)
         }
         .result()?;
         let mult_pipeline = pipelines[0];
         let add_pipeline = pipelines[1];
+        let sub_pipeline = pipelines[2];
 
         unsafe {
             core.device
@@ -120,11 +139,16 @@ impl ElementwiseArithmetic {
         Ok(Self {
             mult_pipeline,
             add_pipeline,
+            sub_pipeline,
             pipeline_layout,
             descriptor_set_layout,
             ds_allocator,
             core,
         })
+    }
+
+    pub fn invoke_sub(&mut self, product: &Matrix, scalars: &Matrix) -> Result<Invocation> {
+        self.invoke(product, scalars, self.sub_pipeline)
     }
 
     pub fn invoke_add(&mut self, product: &Matrix, scalars: &Matrix) -> Result<Invocation> {

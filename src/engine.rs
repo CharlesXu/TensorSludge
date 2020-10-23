@@ -189,6 +189,7 @@ impl TensorSludge {
                     dispatch_list.push((Box::new(invocation), actions));
                 }
                 Operation::InplaceAdd(product, scalars)
+                | Operation::InplaceSub(product, scalars)
                 | Operation::InplaceMultiply(product, scalars) => {
                     required_mats.push(product.0);
                     required_mats.push(scalars.0);
@@ -205,6 +206,7 @@ impl TensorSludge {
                             self.elem_arithmetic.invoke_mult(p, s)?
                         }
                         Operation::InplaceAdd(_, _) => self.elem_arithmetic.invoke_add(p, s)?,
+                        Operation::InplaceSub(_, _) => self.elem_arithmetic.invoke_sub(p, s)?,
                         _ => unreachable!(),
                     };
                     let actions = vec![

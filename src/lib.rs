@@ -1,4 +1,3 @@
-use anyhow::Result;
 use genmap::Handle;
 mod engine;
 mod sigmoid;
@@ -39,6 +38,8 @@ pub enum Operation {
     // SigmoidDerivative(Matrix),
     /// Performs the elementwise equivalent of `+=`
     InplaceAdd(Matrix, Matrix),
+    /// Performs the elementwise equivalent of `-=`
+    InplaceSub(Matrix, Matrix),
     /// Performs the elementwise equivalent of `*=`
     InplaceMultiply(Matrix, Matrix),
 }

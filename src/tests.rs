@@ -1,3 +1,4 @@
+use anyhow::Result;
 use crate::*;
 
 #[cfg(test)]
@@ -184,6 +185,7 @@ fn elementwise_ops() -> Result<()> {
     let pass = ts.create_pass(&[
         Operation::InplaceAdd(a, b),
         Operation::InplaceMultiply(a, b),
+        Operation::InplaceSub(a, b),
     ])?;
 
     let a_data = (1..=ROWS * COLS)
@@ -194,7 +196,7 @@ fn elementwise_ops() -> Result<()> {
 
     let b_data = (1..=ROWS * COLS)
         .rev()
-        .map(|v| (v * v) as f32)
+        .map(|v| (v * 3) as f32)
         .into_iter()
         .collect::<Vec<_>>();
     ts.write(b, &b_data)?;
@@ -205,7 +207,7 @@ fn elementwise_ops() -> Result<()> {
     ts.read(a, &mut output)?;
 
     assert!(a_data.iter().zip(b_data.iter())
-        .map(|(a, b)| (a + b) * b)
+        .map(|(a, b)| (a + b) * b - b)
         .zip(output.iter())
         .all(|(a, &b)| (a - b).abs() < std::f32::EPSILON));
 
