@@ -5,9 +5,8 @@ use anyhow::{Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
 
-pub struct Sigmoid {
+pub struct ScalarOps {
     pipeline: vk::Pipeline,
-    deriv_pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
@@ -17,15 +16,15 @@ pub struct Sigmoid {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
+    scalar: f32,
     invocations: u32,
     pipeline: vk::Pipeline,
 }
 
-const SHADER_SPV_PATH: &str = "shaders/sigmoid.comp.spv";
-const DERIV_SHADER_SPV_PATH: &str = "shaders/sigmoid_deriv.comp.spv";
+const SHADER_SPV_PATH: &str = "shaders/scalar_mul.comp.spv";
 const LOCAL_SIZE_X: u32 = 16;
 
-impl Sigmoid {
+impl ScalarOps {
     pub fn new(core: SharedCore) -> Result<Self> {
         // Layout:
         let bindings = [vk::DescriptorSetLayoutBindingBuilder::new()
@@ -44,23 +43,22 @@ impl Sigmoid {
 
         // Load shader
         let shader_spirv =
-            std::fs::read(SHADER_SPV_PATH).context("Sigmoid shader failed to load")?;
+            std::fs::read(SHADER_SPV_PATH).context("ScalarOps shader failed to load")?;
         let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
         let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
         let shader_module =
             unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
 
-        let shader_spirv =
-            std::fs::read(DERIV_SHADER_SPV_PATH).context("Sigmoid shader failed to load")?;
-        let shader_decoded = decode_spv(&shader_spirv).context("Shader decode failed")?;
-        let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
-        let deriv_shader_module =
-            unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
-
         // Pipeline
+        let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)
+            .offset(0)
+            .size(std::mem::size_of::<f32>() as u32)];
+
         let descriptor_set_layouts = [descriptor_set_layout];
-        let create_info =
-            vk::PipelineLayoutCreateInfoBuilder::new().set_layouts(&descriptor_set_layouts);
+        let create_info = vk::PipelineLayoutCreateInfoBuilder::new()
+            .push_constant_ranges(&push_constant_ranges)
+            .set_layouts(&descriptor_set_layouts);
         let pipeline_layout =
             unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
 
@@ -75,27 +73,16 @@ impl Sigmoid {
             .stage(stage)
             .layout(pipeline_layout);
 
-        let stage = vk::PipelineShaderStageCreateInfoBuilder::new()
-            .stage(vk::ShaderStageFlagBits::COMPUTE)
-            .module(deriv_shader_module)
-            .name(&entry_point)
-            .build();
-        let deriv_create_info = vk::ComputePipelineCreateInfoBuilder::new()
-            .stage(stage)
-            .layout(pipeline_layout);
-
         let pipelines = unsafe {
             core.device
-                .create_compute_pipelines(None, &[create_info, deriv_create_info], None)
+                .create_compute_pipelines(None, &[create_info], None)
         }
         .result()?;
 
         let pipeline = pipelines[0];
-        let deriv_pipeline = pipelines[1];
 
         unsafe {
             core.device.destroy_shader_module(Some(shader_module), None);
-            core.device.destroy_shader_module(Some(deriv_shader_module), None);
         }
 
         // Create descriptor set allocator
@@ -106,7 +93,6 @@ impl Sigmoid {
 
         Ok(Self {
             pipeline,
-            deriv_pipeline,
             pipeline_layout,
             descriptor_set_layout,
             ds_allocator,
@@ -114,15 +100,7 @@ impl Sigmoid {
         })
     }
 
-    pub fn invoke_deriv(&mut self, matrix: &Matrix) -> Result<Invocation> {
-        self.invoke_internal(matrix, self.deriv_pipeline)
-    }
-
-    pub fn invoke(&mut self, matrix: &Matrix) -> Result<Invocation> {
-        self.invoke_internal(matrix, self.pipeline)
-    }
-
-    pub fn invoke_internal(&mut self, matrix: &Matrix, pipeline: vk::Pipeline) -> Result<Invocation> {
+    pub fn invoke(&mut self, matrix: &Matrix, scalar: f32) -> Result<Invocation> {
         let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
@@ -142,7 +120,8 @@ impl Sigmoid {
         let invocations = ((matrix.rows() * matrix.cols()) as u32 / LOCAL_SIZE_X) + 1;
 
         Ok(Invocation {
-            pipeline,
+            pipeline: self.pipeline,
+            scalar,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
             invocations,
@@ -168,16 +147,26 @@ impl crate::engine::Invocation for Invocation {
                 self.pipeline,
             );
 
+            let constants = [self.scalar];
+            let constants: &[u8] = bytemuck::cast_slice(&constants[..]);
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                constants.len() as u32,
+                constants.as_ptr() as _,
+            );
+
             device.cmd_dispatch(command_buffer, self.invocations, 1, 1);
         }
     }
 }
 
-impl Drop for Sigmoid {
+impl Drop for ScalarOps {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
-            self.core.device.destroy_pipeline(Some(self.deriv_pipeline), None);
             self.core
                 .device
                 .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);

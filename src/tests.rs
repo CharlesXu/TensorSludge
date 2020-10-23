@@ -248,3 +248,38 @@ fn elementwise_ops() -> Result<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+#[test]
+fn scalar_mul() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    const ROWS: usize = 300;
+    const COLS: usize = 300;
+    const SCALAR: f32 = 1.5324;
+
+    let matrix = ts.matrix(ROWS, COLS)?;
+
+    let pass = ts.create_pass(&[Operation::ScalarMultiply(matrix, SCALAR)])?;
+
+    let data = (1..=ROWS * COLS)
+        .map(|v| v as f32)
+        .into_iter()
+        .collect::<Vec<_>>();
+
+    ts.write(matrix, &data)?;
+
+    ts.flow(pass)?;
+
+    let mut output = [0.; ROWS * COLS];
+    ts.read(matrix, &mut output)?;
+
+    assert!(data
+        .iter()
+        .map(|v| v * SCALAR)
+        .zip(output.iter())
+        .all(|(a, &b)| (a - b).abs() < EPSILON));
+
+    Ok(())
+}
+
+

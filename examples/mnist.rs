@@ -150,7 +150,7 @@ fn main() -> Result<()> {
     let mut input_buf = vec![0.; IMG_SIZE];
     let mut output_buf = vec![0.; OUTPUT_SIZE];
 
-    let mut tmp_out = vec![0.; HIDDEN_L2 * OUTPUT_SIZE];
+    let mut tmp_out = vec![0.; HIDDEN_L1 * IMG_SIZE];
 
     // Training loop
     for (label, img) in mnist
@@ -180,7 +180,7 @@ fn main() -> Result<()> {
         // Write to output error for backprop
         ts.write(output_error_layer, &output_buf)?;
         ts.flow(backward_pass)?;
-        ts.read(grad_l2, &mut tmp_out)?;
+        ts.read(grad_l0, &mut tmp_out)?;
         dbg!(&tmp_out);
     }
 

@@ -6,6 +6,7 @@ mod pass;
 mod matrix_multiply;
 mod desc_set_allocator;
 mod elem_arithmetic;
+mod scalar_ops;
 mod tests;
 pub use engine::TensorSludge;
 
@@ -42,4 +43,6 @@ pub enum Operation {
     InplaceSub(Matrix, Matrix),
     /// Performs the elementwise equivalent of `*=`
     InplaceMultiply(Matrix, Matrix),
+    /// Performs in-place scalar multiplication
+    ScalarMultiply(Matrix, f32),
 }

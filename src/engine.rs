@@ -1,6 +1,7 @@
 use crate::elem_arithmetic::ElementwiseArithmetic;
 use crate::matrix::Matrix;
 use crate::matrix_multiply::MatrixMultiply;
+use crate::scalar_ops::ScalarOps;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
 use anyhow::{bail, format_err, Context, Result};
@@ -27,6 +28,7 @@ pub struct TensorSludge {
     sigmoid: Sigmoid,
     matrix_multiply: MatrixMultiply,
     elem_arithmetic: ElementwiseArithmetic,
+    scalar_ops: ScalarOps,
     queue: vk::Queue,
 }
 
@@ -116,11 +118,13 @@ impl TensorSludge {
         let sigmoid = Sigmoid::new(core.clone())?;
         let matrix_multiply = MatrixMultiply::new(core.clone())?;
         let elem_arithmetic = ElementwiseArithmetic::new(core.clone())?;
+        let scalar_ops = ScalarOps::new(core.clone())?;
 
         Ok(Self {
             command_pool,
             matrix_multiply,
             elem_arithmetic,
+            scalar_ops,
             matrices: GenMap::with_capacity(10),
             passes: GenMap::with_capacity(10),
             sigmoid,
@@ -176,6 +180,17 @@ impl TensorSludge {
         let mut dispatch_list: Vec<(Box<dyn Invocation>, Vec<BufferAction>)> = Vec::new();
         for op in ops {
             match op {
+                Operation::ScalarMultiply(mat, scalar) => {
+                    required_mats.push(mat.0);
+                    let matrix = self.matrices.get(mat.0).context("Matrix was deleted")?;
+                    let invocation = self.scalar_ops.invoke(matrix, *scalar)?;
+                    let actions = vec![BufferAction {
+                        matrix: mat.0,
+                        read: true,
+                        write: true,
+                    }];
+                    dispatch_list.push((Box::new(invocation), actions));
+                }
                 Operation::Sigmoid(mat) | Operation::SigmoidDerivative(mat) => {
                     required_mats.push(mat.0);
                     let matrix = self.matrices.get(mat.0).context("Matrix was deleted")?;
