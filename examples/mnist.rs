@@ -42,7 +42,7 @@ fn main() -> Result<()> {
     const HIDDEN_L2: usize = 64;
     const OUTPUT_SIZE: usize = 10;
 
-    // Build weight and activation buffers 
+    // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1)?;
 
     let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE)?;
@@ -66,7 +66,8 @@ fn main() -> Result<()> {
     random_weights(weights_l1, HIDDEN_L2 * HIDDEN_L1, &mut ts, &mut rng)?;
     random_weights(weights_l2, OUTPUT_SIZE * HIDDEN_L2, &mut ts, &mut rng)?;
 
-    let forward_pass = vec![ // The boof
+    let forward_pass = vec![
+        // The boof
         Operation::MatrixMultiply {
             left: weights_l0,
             right: input_layer,
@@ -95,15 +96,18 @@ fn main() -> Result<()> {
 
     let learning_rate = 0.05;
 
-    let backward_pass = vec![ // The reverse boof
-        Operation::MatrixMultiply { // Compute gradient for weights in layer 2 (outer product)
-            left: output_error_layer, // 
+    let backward_pass = vec![
+        // The reverse boof
+        Operation::MatrixMultiply {
+            // Compute gradient for weights in layer 2 (outer product)
+            left: output_error_layer, //
             right: activations_l1,
             dst: grad_l2,
             left_transpose: false,
             right_transpose: true,
         },
-        Operation::MatrixMultiply { // Compute errors for next layer
+        Operation::MatrixMultiply {
+            // Compute errors for next layer
             left: weights_l2,
             right: output_error_layer,
             dst: error_l1,
@@ -115,14 +119,16 @@ fn main() -> Result<()> {
         Operation::SigmoidDerivative(activations_l1), // More error propagation
         Operation::InplaceMultiply(error_l1, activations_l1),
         //
-        Operation::MatrixMultiply { // Compute gradient for weights in layer 1 (outer product)
-            left: error_l1, // 
+        Operation::MatrixMultiply {
+            // Compute gradient for weights in layer 1 (outer product)
+            left: error_l1, //
             right: activations_l0,
             dst: grad_l1,
             left_transpose: false,
             right_transpose: true,
         },
-        Operation::MatrixMultiply { // Compute errors for next layer
+        Operation::MatrixMultiply {
+            // Compute errors for next layer
             left: weights_l1,
             right: error_l1,
             dst: error_l0,
@@ -134,8 +140,9 @@ fn main() -> Result<()> {
         Operation::SigmoidDerivative(activations_l0), // More error propagation
         Operation::InplaceMultiply(error_l0, activations_l0),
         //
-        Operation::MatrixMultiply { // Compute gradient for weights in layer 1 (outer product)
-            left: error_l0, // 
+        Operation::MatrixMultiply {
+            // Compute gradient for weights in layer 1 (outer product)
+            left: error_l0, //
             right: input_layer,
             dst: grad_l0,
             left_transpose: false,
@@ -159,7 +166,6 @@ fn main() -> Result<()> {
         .zip(mnist.trn_img.chunks_exact(IMG_SIZE))
         .enumerate()
     {
-
         // Feed forward
         image_norm(img, &mut input_buf);
         ts.write(input_layer, &input_buf)?;
@@ -177,7 +183,7 @@ fn main() -> Result<()> {
             num_total = 0;
         }
 
-        // Difference with train val 
+        // Difference with train val
         output_buf[*label as usize] -= 1.;
 
         // Softmax before backprop step
@@ -191,7 +197,11 @@ fn main() -> Result<()> {
     println!("Computing accuracy...");
     let mut num_correct = 0;
     let mut num_total = 0;
-    for (label, img) in mnist.tst_lbl.iter().zip(mnist.tst_img.chunks_exact(IMG_SIZE)) {
+    for (label, img) in mnist
+        .tst_lbl
+        .iter()
+        .zip(mnist.tst_img.chunks_exact(IMG_SIZE))
+    {
         image_norm(img, &mut input_buf);
         ts.write(input_layer, &input_buf)?;
         ts.flow(forward_pass)?;
@@ -209,9 +219,8 @@ fn main() -> Result<()> {
 }
 
 fn image_norm(image: &[u8], out: &mut [f32]) {
-    out
-        .iter_mut()
-        .zip(image.iter().map(|&v| v as f32 / 255.)) 
+    out.iter_mut()
+        .zip(image.iter().map(|&v| v as f32 / 255.))
         .for_each(|(o, i)| *o = i);
 }
 

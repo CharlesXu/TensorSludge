@@ -281,5 +281,3 @@ fn scalar_mul() -> Result<()> {
 
     Ok(())
 }
-
-

@@ -1,12 +1,12 @@
 use genmap::Handle;
-mod engine;
-mod sigmoid;
-mod matrix;
-mod pass;
-mod matrix_multiply;
 mod desc_set_allocator;
 mod elem_arithmetic;
+mod engine;
+mod matrix;
+mod matrix_multiply;
+mod pass;
 mod scalar_ops;
+mod sigmoid;
 mod tests;
 pub use engine::TensorSludge;
 

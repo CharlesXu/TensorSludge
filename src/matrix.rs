@@ -1,5 +1,5 @@
 use crate::engine::SharedCore;
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use erupt::{
     utils::allocator::{Allocation, MappedMemory, MemoryTypeFinder},
     vk1_0 as vk,

@@ -95,7 +95,8 @@ impl Sigmoid {
 
         unsafe {
             core.device.destroy_shader_module(Some(shader_module), None);
-            core.device.destroy_shader_module(Some(deriv_shader_module), None);
+            core.device
+                .destroy_shader_module(Some(deriv_shader_module), None);
         }
 
         // Create descriptor set allocator
@@ -122,7 +123,11 @@ impl Sigmoid {
         self.invoke_internal(matrix, self.pipeline)
     }
 
-    pub fn invoke_internal(&mut self, matrix: &Matrix, pipeline: vk::Pipeline) -> Result<Invocation> {
+    pub fn invoke_internal(
+        &mut self,
+        matrix: &Matrix,
+        pipeline: vk::Pipeline,
+    ) -> Result<Invocation> {
         let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
@@ -177,7 +182,9 @@ impl Drop for Sigmoid {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
-            self.core.device.destroy_pipeline(Some(self.deriv_pipeline), None);
+            self.core
+                .device
+                .destroy_pipeline(Some(self.deriv_pipeline), None);
             self.core
                 .device
                 .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);

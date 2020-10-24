@@ -1,7 +1,5 @@
 use crate::Operation;
 
-pub struct Pass {
-}
+pub struct Pass {}
 
-impl Pass {
-}
+impl Pass {}

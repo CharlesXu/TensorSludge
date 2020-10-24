@@ -110,8 +110,11 @@ impl ElementwiseArithmetic {
             .layout(pipeline_layout);
 
         let pipelines = unsafe {
-            core.device
-                .create_compute_pipelines(None, &[mult_create_info, add_create_info, sub_create_info], None)
+            core.device.create_compute_pipelines(
+                None,
+                &[mult_create_info, add_create_info, sub_create_info],
+                None,
+            )
         }
         .result()?;
         let mult_pipeline = pipelines[0];
