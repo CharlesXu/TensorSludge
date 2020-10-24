@@ -10,10 +10,17 @@ pub struct Matrix {
     cols: usize,
     data: Option<Allocation<vk::Buffer>>,
     core: SharedCore,
+    name: String,
 }
 
 impl Matrix {
-    pub fn new(rows: usize, cols: usize, core: SharedCore) -> Result<Self> {
+    pub fn new(
+        rows: usize,
+        cols: usize,
+        name: impl Into<String>,
+        core: SharedCore,
+    ) -> Result<Self> {
+        let name = name.into();
         let buffer_size = cols * rows * std::mem::size_of::<f32>();
         let create_info = vk::BufferCreateInfoBuilder::new()
             .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
@@ -35,6 +42,7 @@ impl Matrix {
             cols,
             data,
             core,
+            name,
         })
     }
 
@@ -50,15 +58,31 @@ impl Matrix {
         self.data.as_ref().unwrap()
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     fn map(&mut self) -> Result<MappedMemory> {
         let mapping = self.allocation().map(&self.core.device, ..).result()?;
         Ok(mapping)
     }
 
-    pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
-        if self.rows() * self.cols() != buf.len() {
-            bail!("Mismatched buffer sizes");
+    fn chk_buf_mismatch(&self, buf: &[f32]) -> Result<()> {
+        let mat_len = self.rows() * self.cols();
+        if buf.len() != mat_len {
+            bail!(
+                "Buffer of size {} does not match the length of data in matrix \"{}\", {}",
+                buf.len(),
+                self.name,
+                mat_len
+            )
+        } else {
+            Ok(())
         }
+    }
+
+    pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
+        self.chk_buf_mismatch(buf)?;
         let mapping = self.map()?;
         buf.copy_from_slice(bytemuck::cast_slice(mapping.read()));
         mapping.unmap(&self.core.device).result()?;
@@ -66,9 +90,7 @@ impl Matrix {
     }
 
     pub fn write(&mut self, buf: &[f32]) -> Result<()> {
-        if self.rows() * self.cols() != buf.len() {
-            bail!("Mismatched buffer sizes");
-        }
+        self.chk_buf_mismatch(buf)?;
         let mut mapping = self.map()?;
         mapping.import(bytemuck::cast_slice(buf));
         mapping.unmap(&self.core.device).result()?;

@@ -21,15 +21,11 @@ fn softmax(data: &mut [f32]) {
     data.iter_mut().for_each(|v| *v /= sum);
 }
 
+/*
 fn mse(input: &[f32]) -> f32 {
     input.iter().map(|&v| v * v).sum::<f32>() / input.len() as f32
 }
-
-/* Wishlist:
- * Sigmoid deriv
- * Elementwise mul
- * Elementwise add
- */
+*/
 
 fn main() -> Result<()> {
     let mut ts = TensorSludge::new()?;
@@ -43,22 +39,22 @@ fn main() -> Result<()> {
     const OUTPUT_SIZE: usize = 10;
 
     // Build weight and activation buffers
-    let input_layer = ts.matrix(IMG_SIZE, 1)?;
+    let input_layer = ts.matrix(IMG_SIZE, 1, "input_layer")?;
 
-    let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE)?;
-    let activations_l0 = ts.matrix(HIDDEN_L1, 1)?;
-    let grad_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE)?;
-    let error_l0 = ts.matrix(HIDDEN_L1, 1)?;
+    let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE, "weights_l0")?;
+    let activations_l0 = ts.matrix(HIDDEN_L1, 1, "activations_l0")?;
+    let grad_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE, "grad_l0")?;
+    let error_l0 = ts.matrix(HIDDEN_L1, 1, "error_l0")?;
 
-    let weights_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1)?;
-    let activations_l1 = ts.matrix(HIDDEN_L2, 1)?;
-    let grad_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1)?;
-    let error_l1 = ts.matrix(HIDDEN_L2, 1)?;
+    let weights_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1, "weights_l1")?;
+    let activations_l1 = ts.matrix(HIDDEN_L2, 1, "activations_l1")?;
+    let grad_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1, "grad_l1")?;
+    let error_l1 = ts.matrix(HIDDEN_L2, 1, "error_l1")?;
 
-    let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
-    let output_layer = ts.matrix(OUTPUT_SIZE, 1)?;
-    let grad_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2)?;
-    let output_error_layer = ts.matrix(OUTPUT_SIZE, 1)?;
+    let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2, "weights_l2")?;
+    let output_layer = ts.matrix(OUTPUT_SIZE, 1, "output_layer")?;
+    let grad_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2, "grad_l2")?;
+    let output_error_layer = ts.matrix(OUTPUT_SIZE, 1, "output_error_layer")?;
 
     // Weight initialization
     let mut rng = rand::thread_rng();

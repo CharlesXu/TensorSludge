@@ -1,7 +1,7 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
 use crate::engine::SharedCore;
 use crate::matrix::Matrix;
-use anyhow::{ensure, Context, Result};
+use anyhow::{bail, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
 
@@ -157,26 +157,35 @@ impl MatrixMultiply {
             )
         };
 
-        let invalid_msg = "Input matrix dimensions invalid for multiplication";
-        match (a_transpose, b_transpose) {
-            (false, false) => ensure!(a.cols() == b.rows(), invalid_msg),
-            (true, false) => ensure!(a.rows() == b.rows(), invalid_msg),
-            (false, true) => ensure!(a.cols() == b.cols(), invalid_msg),
-            (true, true) => ensure!(a.rows() == b.cols(), invalid_msg),
+        let out_rows = if a_transpose { a.cols() } else { a.rows() } as u32;
+        let out_cols = if b_transpose { b.rows() } else { b.cols() } as u32;
+
+        let a_cols = if a_transpose { a.rows() } else { a.cols() } as u32;
+        let b_rows = if b_transpose { b.cols() } else { b.rows() } as u32;
+
+        if a_cols != b_rows {
+            bail!("Cannot multiply; Matrix \"{}\"'s columns ({}) do not equal matrix \"{}\"'s rows ({})",
+                a.name(),
+                a_cols,
+                b.name(),
+                b_rows
+            )
         }
 
         let inner_rc = if b_transpose { b.cols() } else { b.rows() } as u32;
 
-        let out_rows = if a_transpose { a.cols() } else { a.rows() } as u32;
-
-        let out_cols = if b_transpose { b.rows() } else { b.cols() } as u32;
-
-        let invalid_msg = "Output matrix dimensions invalid for input sizes in multiplication";
-        ensure!(
-            dst.cols() as u32 == out_cols && dst.rows() as u32 == out_rows,
-            invalid_msg
-        );
-
+        if dst.cols() as u32 != out_cols || dst.rows() as u32 != out_rows {
+            bail!("Output matrix \"{}\" ({}x{}) does not have the dimensions to store the multiplication of \"{}\" and \"{}\", whose size is ({}x{})",
+                dst.name(),
+                dst.rows(),
+                dst.cols(),
+                a.name(),
+                b.name(),
+                out_rows,
+                out_cols,
+            )
+        }
+            
         Ok(Invocation {
             a_cols: a.cols() as u32,
             b_cols: b.cols() as u32,

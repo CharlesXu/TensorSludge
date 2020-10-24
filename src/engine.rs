@@ -134,10 +134,11 @@ impl TensorSludge {
     }
 
     /// Create a new matrix with the specified dimensions
-    pub fn matrix(&mut self, rows: usize, cols: usize) -> Result<crate::Matrix> {
+    pub fn matrix(&mut self, rows: usize, cols: usize, name: impl Into<String>) -> Result<crate::Matrix> {
         Ok(crate::Matrix(self.matrices.insert(Matrix::new(
             rows,
             cols,
+            name,
             self.core.clone(),
         )?)))
     }
@@ -148,9 +149,11 @@ impl TensorSludge {
             .context("Matrix was deleted")
     }
 
+    /*
     fn get_matrix<'a>(&'a self, matrix: crate::Matrix) -> Result<&'a Matrix> {
         self.matrices.get(matrix.0).context("Matrix was deleted")
     }
+    */
 
     /// Write data to a matrix in row-major order
     pub fn write(&mut self, matrix: crate::Matrix, data: &[f32]) -> Result<()> {
