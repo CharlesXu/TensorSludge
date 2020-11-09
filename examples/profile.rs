@@ -30,8 +30,9 @@ fn mse(input: &[f32]) -> f32 {
 */
 
 fn main() -> Result<()> {
-    for size in 0..7 {
+    for size in 1..=7 {
         let size = size * size;
+        println!("Testing size {}...", size);
         let duration = profile(size, size)?;
         println!("Time for size {}: {}", size, duration.as_secs_f64());
     }
