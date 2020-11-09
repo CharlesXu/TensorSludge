@@ -1,29 +1,16 @@
 #version 450
-layout (local_size_x = 16, local_size_y = 16) in;
-
-layout(binding = 0) readonly buffer InA {
-    float in_a[];
-};
-
-layout(binding = 1) readonly buffer InB {
-    float in_b[];
-};
-
-layout(binding = 2) writeonly buffer Product {
-    float product[];
-};
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 16) in;
+layout (binding=0, r32f) uniform readonly image2DArray in_a;
+layout (binding=1, r32f) uniform readonly image2DArray in_b;
+layout (binding=2, r32f) uniform writeonly image2DArray product;
 
 layout(push_constant) uniform Sizes {
-    uint a_cols;
-    uint b_cols;
-    uint out_rows; // Rows of in_a, product
-    uint out_cols; // Columns of in_b, product
-    uint inner_rc; /// Columns of in_a, Rows of in_B
+    uint inner_rc; // Inner size
     uint transpose_a; // Multiply as if in_a was transposed
     uint transpose_b; // Multiply as if in_b was transposed
 };
 
-uvec2 gid = gl_GlobalInvocationID.xy;
+ivec3 gid = ivec3(gl_GlobalInvocationID);
 
 float matmul();
 float matmul_aT();
@@ -31,27 +18,31 @@ float matmul_bT();
 float matmul_aTbT();
 
 void main() {
-    if (gid.x >= out_cols || gid.y >= out_rows) return;
-    uint output_idx = gid.y * out_cols + gid.x;
+    ivec3 product_dims = imageSize(product);
+    if (product_dims.z >= gid.z || product_dims.y >= gid.y || product_dims.x >= gid.x) return;
+    float prod;
     if (bool(transpose_a)) {
         if (bool(transpose_b)) {
-            product[output_idx] = matmul_aTbT();
+            prod = matmul_aTbT();
         } else {
-            product[output_idx] = matmul_aT();
+            prod = matmul_aT();
         }
     } else {
         if (bool(transpose_b)) {
-            product[output_idx] = matmul_bT();
+            prod = matmul_bT();
         } else {
-            product[output_idx] = matmul();
+            prod = matmul();
         }
     }
+    imageStore(product, gid, vec4(prod, 0., 0., 0.));
 }
 
 float matmul() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * a_cols + i] * in_b[i * b_cols + gid.x];
+        ivec3 a_coord = ivec3(i, gid.y, gid.z);
+        ivec3 b_coord = ivec3(gid.x, i, gid.z);
+        sum += imageLoad(in_a, a_coord).x * imageLoad(in_b, b_coord).x;
     }
     return sum;
 }
@@ -59,7 +50,9 @@ float matmul() {
 float matmul_aT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + a_cols * i] * in_b[i * b_cols + gid.x];
+        ivec3 a_coord = ivec3(gid.y, i, gid.z);
+        ivec3 b_coord = ivec3(gid.x, i, gid.z);
+        sum += imageLoad(in_a, a_coord).x * imageLoad(in_b, b_coord).x;
     }
     return sum;
 }
@@ -67,7 +60,9 @@ float matmul_aT() {
 float matmul_bT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * a_cols + i] * in_b[i + b_cols * gid.x];
+        ivec3 a_coord = ivec3(i, gid.y, gid.z);
+        ivec3 b_coord = ivec3(i, gid.x, gid.z);
+        sum += imageLoad(in_a, a_coord).x * imageLoad(in_b, b_coord).x;
     }
     return sum;
 }
@@ -75,7 +70,9 @@ float matmul_bT() {
 float matmul_aTbT() {
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + a_cols * i] * in_b[i + b_cols * gid.x];
+        ivec3 a_coord = ivec3(gid.y, i, gid.z);
+        ivec3 b_coord = ivec3(i, gid.x, gid.z);
+        sum += imageLoad(in_a, a_coord).x * imageLoad(in_b, b_coord).x;
     }
     return sum;
 }

@@ -35,3 +35,7 @@ A small, GPU-accelerated neural net library I've built from scratch in order to 
 * Python interface, much like PyTorch or TensorFlow
 * Real time training experiments
 * 3D visualizations of internals working in real time (The memory is already on-GPU, why not display it?)
+
+## Current branch
+- [ ] Dedicated transfer queue to copy to/from images
+- [ ] Switch everything over to use images

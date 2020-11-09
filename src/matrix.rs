@@ -8,15 +8,19 @@ use erupt::{
 pub struct Matrix {
     rows: usize,
     cols: usize,
-    data: Option<Allocation<vk::Buffer>>,
-    core: SharedCore,
+    layers: usize,
     name: String,
+    data: Option<Allocation<vk::Image>>,
+    core: SharedCore,
 }
+
+const IMAGE_FORMAT: vk::Format = vk::Format::R32_SFLOAT;
 
 impl Matrix {
     pub fn new(
         rows: usize,
         cols: usize,
+        layers: usize,
         name: impl Into<String>,
         core: SharedCore,
     ) -> Result<Self> {
@@ -27,19 +31,36 @@ impl Matrix {
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .size(buffer_size as u64);
 
-        // TODO: This should really use a staging buffer... Perhaps make host-visible mats an
-        // option? Still need to be able to write random numbers but a compute shader could be used
-        // for that...
-        let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
-        let data = core
-            .allocator()?
-            .allocate(&core.device, buffer, MemoryTypeFinder::dynamic())
+        let extent_3d = vk::Extent3DBuilder::new()
+            .width(rows as _)
+            .height(cols as _)
+            .depth(1)
+            .build();
+
+        let create_info = vk::ImageCreateInfoBuilder::new()
+            .image_type(vk::ImageType::_2D)
+            .extent(extent_3d)
+            .mip_levels(1)
+            .array_layers(layers as _)
+            .format(IMAGE_FORMAT)
+            .tiling(vk::ImageTiling::LINEAR)
+            .initial_layout(vk::ImageLayout::UNDEFINED)
+            .usage(vk::ImageUsageFlags::STORAGE | vk::ImageUsageFlags::TRANSFER_SRC)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .samples(vk::SampleCountFlagBits::_1);
+
+        let image = unsafe { core.device.create_image(&create_info, None, None) }.result()?;
+
+        let data = core.allocator()?
+            .allocate(&core.device, image, MemoryTypeFinder::dynamic())
             .result()?;
+
         let data = Some(data);
 
         Ok(Self {
             rows,
             cols,
+            layers,
             data,
             core,
             name,
@@ -54,7 +75,7 @@ impl Matrix {
         self.cols
     }
 
-    pub fn allocation<'a>(&'a self) -> &'a Allocation<vk::Buffer> {
+    pub fn allocation<'a>(&'a self) -> &'a Allocation<vk::Image> {
         self.data.as_ref().unwrap()
     }
 
