@@ -11,6 +11,7 @@ pub struct ScalarOps {
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
     ds_allocator: DescriptorSetAllocator,
+    local_size_x: u32,
 }
 
 pub struct Invocation {
@@ -19,13 +20,13 @@ pub struct Invocation {
     scalar: f32,
     invocations: u32,
     pipeline: vk::Pipeline,
+    local_size_x: u32,
 }
 
 const SHADER_SPV_PATH: &str = "shaders/scalar_mul.comp.spv";
-const LOCAL_SIZE_X: u32 = 16;
 
 impl ScalarOps {
-    pub fn new(core: SharedCore) -> Result<Self> {
+    pub fn new(core: SharedCore, local_size_x: u32) -> Result<Self> {
         // Layout:
         let bindings = [vk::DescriptorSetLayoutBindingBuilder::new()
             .binding(0)
@@ -97,6 +98,7 @@ impl ScalarOps {
             descriptor_set_layout,
             ds_allocator,
             core,
+            local_size_x,
         })
     }
 
@@ -117,9 +119,10 @@ impl ScalarOps {
             )
         };
 
-        let invocations = ((matrix.rows() * matrix.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        let invocations = ((matrix.rows() * matrix.cols()) as u32 / self.local_size_x) + 1;
 
         Ok(Invocation {
+            local_size_x: self.local_size_x,
             pipeline: self.pipeline,
             scalar,
             pipeline_layout: self.pipeline_layout,

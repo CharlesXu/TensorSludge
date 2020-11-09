@@ -12,6 +12,7 @@ pub struct Sigmoid {
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
     ds_allocator: DescriptorSetAllocator,
+    local_size_x: u32,
 }
 
 pub struct Invocation {
@@ -23,10 +24,9 @@ pub struct Invocation {
 
 const SHADER_SPV_PATH: &str = "shaders/sigmoid.comp.spv";
 const DERIV_SHADER_SPV_PATH: &str = "shaders/sigmoid_deriv.comp.spv";
-const LOCAL_SIZE_X: u32 = 16;
 
 impl Sigmoid {
-    pub fn new(core: SharedCore) -> Result<Self> {
+    pub fn new(core: SharedCore, local_size_x: u32) -> Result<Self> {
         // Layout:
         let bindings = [vk::DescriptorSetLayoutBindingBuilder::new()
             .binding(0)
@@ -112,6 +112,7 @@ impl Sigmoid {
             descriptor_set_layout,
             ds_allocator,
             core,
+            local_size_x,
         })
     }
 
@@ -144,7 +145,7 @@ impl Sigmoid {
             )
         };
 
-        let invocations = ((matrix.rows() * matrix.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        let invocations = ((matrix.rows() * matrix.cols()) as u32 / self.local_size_x) + 1;
 
         Ok(Invocation {
             pipeline,

@@ -5,15 +5,14 @@ use anyhow::{bail, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
 
-const LOCAL_SIZE_X: u32 = 16;
-const LOCAL_SIZE_Y: u32 = 16;
-
 pub struct MatrixMultiply {
     pipeline: vk::Pipeline,
     pipeline_layout: vk::PipelineLayout,
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
     ds_allocator: DescriptorSetAllocator,
+    local_size_x: u32,
+    local_size_y: u32,
 }
 
 pub struct Invocation {
@@ -27,10 +26,15 @@ pub struct Invocation {
     a_transpose: bool,
     b_transpose: bool,
     pipeline: vk::Pipeline,
+    local_size_x: u32,
+    local_size_y: u32,
 }
 
 impl MatrixMultiply {
-    pub fn new(core: SharedCore) -> Result<Self> {
+    pub fn new(core: SharedCore,
+    local_size_x: u32,
+    local_size_y: u32,
+        ) -> Result<Self> {
         // Layout:
         let bindings = [
             vk::DescriptorSetLayoutBindingBuilder::new()
@@ -113,6 +117,8 @@ impl MatrixMultiply {
             descriptor_set_layout,
             ds_allocator,
             core,
+            local_size_x,
+            local_size_y,
         })
     }
 
@@ -197,6 +203,8 @@ impl MatrixMultiply {
             out_rows,
             out_cols,
             inner_rc,
+            local_size_x: self.local_size_x,
+            local_size_y: self.local_size_y,
         })
     }
 }
@@ -238,8 +246,8 @@ impl crate::engine::Invocation for Invocation {
                 self.pipeline,
             );
 
-            let invocations_x = (self.out_cols as u32 / LOCAL_SIZE_X) + 1;
-            let invocations_y = (self.out_rows as u32 / LOCAL_SIZE_Y) + 1;
+            let invocations_x = (self.out_cols as u32 / self.local_size_x) + 1;
+            let invocations_y = (self.out_rows as u32 / self.local_size_y) + 1;
 
             device.cmd_dispatch(command_buffer, invocations_x, invocations_y, 1);
         }

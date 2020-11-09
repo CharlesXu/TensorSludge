@@ -13,6 +13,7 @@ pub struct ElementwiseArithmetic {
     descriptor_set_layout: vk::DescriptorSetLayout,
     core: SharedCore,
     ds_allocator: DescriptorSetAllocator,
+    local_size_x: u32,
 }
 
 pub struct Invocation {
@@ -25,10 +26,9 @@ pub struct Invocation {
 const MULT_SHADER_PATH: &str = "shaders/elem_mult.comp.spv";
 const ADD_SHADER_PATH: &str = "shaders/elem_add.comp.spv";
 const SUB_SHADER_PATH: &str = "shaders/elem_sub.comp.spv";
-const LOCAL_SIZE_X: u32 = 16;
 
 impl ElementwiseArithmetic {
-    pub fn new(core: SharedCore) -> Result<Self> {
+    pub fn new(core: SharedCore, local_size_x: u32) -> Result<Self> {
         // Layout:
         let bindings = [
             vk::DescriptorSetLayoutBindingBuilder::new()
@@ -147,6 +147,7 @@ impl ElementwiseArithmetic {
             descriptor_set_layout,
             ds_allocator,
             core,
+            local_size_x,
         })
     }
 
@@ -197,7 +198,7 @@ impl ElementwiseArithmetic {
             )
         };
 
-        let invocations = ((product.rows() * scalars.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        let invocations = ((product.rows() * scalars.cols()) as u32 / self.local_size_x) + 1;
 
         Ok(Invocation {
             pipeline,

@@ -2,7 +2,7 @@ use anyhow::Result;
 use tensorsludge::*;
 
 fn main() -> Result<()> {
-    let mut ts = TensorSludge::new()?;
+    let mut ts = TensorSludge::new(16, 16)?;
 
     let a = ts.matrix(3, 3, "A")?;
     let b = ts.matrix(3, 1, "B")?;

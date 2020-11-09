@@ -43,7 +43,7 @@ pub type SharedCore = Arc<Core>;
 
 impl TensorSludge {
     /// Create a new TensorSludge instance
-    pub fn new() -> Result<Self> {
+    pub fn new(local_size_x: u32, local_size_y: u32) -> Result<Self> {
         let entry = EntryLoader::new()?;
 
         // Instance
@@ -115,10 +115,10 @@ impl TensorSludge {
             _entry: entry,
         });
 
-        let sigmoid = Sigmoid::new(core.clone())?;
-        let matrix_multiply = MatrixMultiply::new(core.clone())?;
-        let elem_arithmetic = ElementwiseArithmetic::new(core.clone())?;
-        let scalar_ops = ScalarOps::new(core.clone())?;
+        let sigmoid = Sigmoid::new(core.clone(), local_size_x)?;
+        let matrix_multiply = MatrixMultiply::new(core.clone(), local_size_x, local_size_y)?;
+        let elem_arithmetic = ElementwiseArithmetic::new(core.clone(), local_size_x)?;
+        let scalar_ops = ScalarOps::new(core.clone(), local_size_x)?;
 
         Ok(Self {
             command_pool,

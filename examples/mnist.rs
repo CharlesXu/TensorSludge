@@ -28,7 +28,7 @@ fn mse(input: &[f32]) -> f32 {
 */
 
 fn main() -> Result<()> {
-    let mut ts = TensorSludge::new()?;
+    let mut ts = TensorSludge::new(16, 16)?;
     let mnist = MnistBuilder::new().download_and_extract().finalize();
 
     // Size constants
