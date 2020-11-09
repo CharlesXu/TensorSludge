@@ -84,7 +84,7 @@ impl Matrix {
     pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
         self.chk_buf_mismatch(buf)?;
         let mapping = self.map()?;
-        buf.copy_from_slice(bytemuck::cast_slice(mapping.read()));
+        buf.copy_from_slice(&bytemuck::cast_slice(mapping.read())[..buf.len()]);
         mapping.unmap(&self.core.device).result()?;
         Ok(())
     }
