@@ -1,5 +1,7 @@
 #version 450
-layout (local_size_x = 16, local_size_y = 16) in;
+#include "in_size.comp"
+
+layout (local_size_x = LOCAL_SIZE_X, local_size_y = LOCAL_SIZE_Y) in;
 
 layout(binding = 0) readonly buffer InA {
     float in_a[];

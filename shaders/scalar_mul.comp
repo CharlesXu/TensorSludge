@@ -1,5 +1,6 @@
 #version 450
-layout (local_size_x = 16) in;
+#include "in_size.comp"
+layout (local_size_x = LOCAL_SIZE_X) in;
 
 layout(binding = 0) buffer Data {
     float data[];
