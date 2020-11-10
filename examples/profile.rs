@@ -1,5 +1,5 @@
 use anyhow::Result;
-use mnist::MnistBuilder;
+use mnist::{Mnist, MnistBuilder};
 use rand::distributions::{Distribution, Uniform};
 use rand::Rng;
 use std::io::Write;
@@ -30,16 +30,16 @@ fn mse(input: &[f32]) -> f32 {
 */
 
 fn main() -> Result<()> {
-    for size in 1..=7 {
-        let size = size * size;
+    let mnist = MnistBuilder::new().download_and_extract().finalize();
+    for size in &[8, 16, 32] {
         println!("Testing size {}...", size);
-        let duration = profile(size, size)?;
+        let duration = profile(*size, *size, &mnist)?;
         println!("Time for size {}: {}", size, duration.as_secs_f64());
     }
     Ok(())
 }
 
-fn profile(local_size_x: u32, local_size_y: u32) -> Result<Duration> {
+fn profile(local_size_x: u32, local_size_y: u32, mnist: &Mnist) -> Result<Duration> {
     let mut file = std::fs::File::create("./shaders/in_size.comp")?;
     let contents = format!(
         "const uint LOCAL_SIZE_X = {};
@@ -56,7 +56,6 @@ const uint LOCAL_SIZE_Z = {};",
     drop(contents);
 
     let mut ts = TensorSludge::new(local_size_x, local_size_y)?;
-    let mnist = MnistBuilder::new().download_and_extract().finalize();
 
     // Size constants
     const IMG_WIDTH: usize = 28;
