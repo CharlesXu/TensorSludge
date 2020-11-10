@@ -282,35 +282,47 @@ fn matrix_layers() -> Result<()> {
 
     let a = ts.matrix(3, 3, 2, "A")?;
     let b = ts.matrix(3, 3, 2, "B")?;
+    let c = ts.matrix(3, 3, 1, "C")?;
     let output = ts.matrix(3, 3, 2, "Output")?;
+    let output_single = ts.matrix(3, 3, 1, "Single output")?;
 
     ts.write(
         a,
         &[
-        1., 2., 3., //
-        4., 5., 6., //
-        7., 8., 9., //
-        //
-        19., 20., 21., //
-        22., 23., 24., //
-        25., 26., 27., //
+            1., 2., 3., //
+            4., 5., 6., //
+            7., 8., 9., //
+            //
+            19., 20., 21., //
+            22., 23., 24., //
+            25., 26., 27., //
         ],
     )?;
 
     ts.write(
         b,
         &[
-        10., 11., 12., //
-        13., 14., 15., //
-        16., 17., 18., //
-        //
-        28., 29., 30., //
-        31., 32., 33., //
-        34., 35., 36., //
+            10., 11., 12., //
+            13., 14., 15., //
+            16., 17., 18., //
+            //
+            28., 29., 30., //
+            31., 32., 33., //
+            34., 35., 36., //
         ],
     )?;
 
-    let pass = ts.create_pass(&[Operation::MatrixMultiply {
+    ts.write(
+        c,
+        &[
+            8., 7., 6., //
+            5., 4., 3., //
+            2., 1., 0., //
+        ],
+    )?;
+
+    // Double layer test
+    let pass_double = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
         right: b,
         dst: output,
@@ -318,7 +330,7 @@ fn matrix_layers() -> Result<()> {
         right_transpose: false,
     }])?;
 
-    ts.flow(pass)?;
+    ts.flow(pass_double)?;
     let mut output_data = [0.; 3 * 3 * 2];
     ts.read(output, &mut output_data)?;
 
@@ -330,6 +342,50 @@ fn matrix_layers() -> Result<()> {
         1866., 1926., 1986., //
         2145., 2214., 2283., //
         2424., 2502., 2580., //
+    ];
+    assert_eq!(output_data, expected);
+
+    // Single output layer test
+    let pass_single = ts.create_pass(&[Operation::MatrixMultiply {
+        left: a,
+        right: b,
+        dst: output_single,
+        left_transpose: false,
+        right_transpose: false,
+    }])?;
+
+    ts.flow(pass_single)?;
+    let mut output_data = [0.; 3 * 3 * 1];
+    ts.read(output_single, &mut output_data)?;
+
+    let expected = [
+        84., 90., 96., //
+        201., 216., 231., //
+        318., 342., 366., //
+    ];
+    assert_eq!(output_data, expected);
+
+    // Double A, single B, double output
+    let pass_hybrid = ts.create_pass(&[Operation::MatrixMultiply {
+        left: a,
+        right: c,
+        dst: output,
+        left_transpose: false,
+        right_transpose: false,
+    }])?;
+
+    ts.flow(pass_hybrid)?;
+    let mut output_data = [0.; 3 * 3 * 2];
+    ts.read(output, &mut output_data)?;
+
+    let expected = [
+        24., 18., 12., //
+        69., 54., 39., //
+        114., 90., 66., //
+        //
+        294., 234., 174., //
+        339., 270., 201., //
+        384., 306., 228., //
     ];
     assert_eq!(output_data, expected);
 
