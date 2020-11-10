@@ -20,7 +20,7 @@ pub struct Invocation {
     pipeline_layout: vk::PipelineLayout,
     invocations: u32,
     pipeline: vk::Pipeline,
-    scalar_layer_size: u32,
+    layer_size: u32,
 }
 
 const MULT_SHADER_PATH: &str = "shaders/elem_mult.comp.spv";
@@ -79,9 +79,8 @@ impl ElementwiseArithmetic {
         let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
             .stage_flags(vk::ShaderStageFlags::COMPUTE)
             .offset(0)
-            .size(std::mem::size_of::<u32>() as u32)];
-        let create_info =
-            vk::PipelineLayoutCreateInfoBuilder::new()
+            .size(std::mem::size_of::<[u32; 2]>() as u32)];
+        let create_info = vk::PipelineLayoutCreateInfoBuilder::new()
             .set_layouts(&descriptor_set_layouts)
             .push_constant_ranges(&push_constant_ranges);
         let pipeline_layout =
@@ -204,15 +203,32 @@ impl ElementwiseArithmetic {
             )
         };
 
-        ensure!(product.layers() == 1, "Elementwise arithmetic output ({}) must have only one layer!", product.name());
-        let invocations = ((scalars.rows() * scalars.cols() * scalars.layers()) as u32 / LOCAL_SIZE_X) + 1;
+        ensure!(
+            product.cols() * product.rows() == scalars.cols() * scalars.rows(),
+            "Elementwise Arithmetic: \"{}\" and \"{}\" must have the same size per layer",
+            product.name(),
+            scalars.name()
+        );
+        /*
+        ensure!(
+            scalars.layers() % product.layers() == 0,
+            "Scalar matrix layer count ({}: {}) must be a multiple of product layer count ({}: {})",
+            scalars.name(),
+            scalars.layers(),
+            product.name(),
+            product.layers()
+        );
+        */
+
+        let invocations =
+            ((scalars.rows() * scalars.cols()) as u32 / LOCAL_SIZE_X) + 1;
 
         Ok(Invocation {
             pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
             invocations,
-            scalar_layer_size: (scalars.rows() * scalars.cols()) as u32,
+            layer_size: (scalars.rows() * scalars.cols()) as u32,
         })
     }
 }
@@ -229,7 +245,7 @@ impl crate::engine::Invocation for Invocation {
                 &[],
             );
 
-            let slice = [self.scalar_layer_size];
+            let slice = [self.layer_size];
             let constants: &[u8] = bytemuck::cast_slice(&slice);
             device.cmd_push_constants(
                 command_buffer,

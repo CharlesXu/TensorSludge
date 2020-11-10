@@ -254,6 +254,7 @@ fn elementwise_layers() -> Result<()> {
     ts.write(b, &[ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 
                   10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
 
+    // One layer with two layers added to it
     let add = ts.create_pass(&[Operation::InplaceAdd(a, b)])?;
 
     ts.flow(add)?;
@@ -262,6 +263,16 @@ fn elementwise_layers() -> Result<()> {
     ts.read(a, &mut output)?;
 
     assert_eq!(output, [19.0, 14.0, 18.0, 18.0, 28.0, 28.0, 24.0, 28.0, 27.0]);
+
+    // Two layers with one layer added across both
+    ts.write(a, &[ 8.,  1.,  3.,  1.,  9.,  7.,  1.,  3.,  0.])?;
+    ts.write(b, &[ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 
+                  10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
+    let add = ts.create_pass(&[Operation::InplaceAdd(b, a)])?;
+    let mut output = [0.; 18];
+    ts.flow(add)?;
+    ts.read(b, &mut output)?;
+    assert_eq!(output, [9.0, 3.0, 6.0, 5.0, 14.0, 13.0, 8.0, 11.0, 9.0, 18.0, 12.0, 15.0, 14.0, 23.0, 22.0, 17.0, 20.0, 18.0]);
 
     Ok(())
 }

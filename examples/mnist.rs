@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     const HIDDEN_L1: usize = 128;
     const HIDDEN_L2: usize = 64;
     const OUTPUT_SIZE: usize = 10;
-    const BATCH_SIZE: usize = 2;
+    const BATCH_SIZE: usize = 1;
 
     // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1, BATCH_SIZE, "input_layer")?;

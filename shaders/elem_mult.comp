@@ -10,12 +10,16 @@ layout(binding = 1) readonly buffer Scalars {
 };
 
 layout(push_constant) uniform Consts {
-    uint scalar_layer_size;
+    uint layer_size;
 };
 
 void main() {
     uint gid = gl_GlobalInvocationID.x;
-    if (gid >= scalars.length()) return;
-    for (uint l = 0; l < scalars.length() / scalar_layer_size; l++)
-        product[gid] *= scalars[gid + scalar_layer_size * l];
+    if (gid >= min(scalars.length(), product.length())) return;
+    uint product_layers = product.length() / layer_size;
+    uint scalar_layers = scalars.length() / layer_size;
+
+    for (uint l = 0; l < max(scalar_layers, product_layers); l++) {
+        product[gid + layer_size * (l % product_layers)] *= scalars[gid + layer_size * (l % scalar_layers)];
+    }
 }
