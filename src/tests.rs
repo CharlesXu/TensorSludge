@@ -245,6 +245,28 @@ fn elementwise_ops() -> Result<()> {
 }
 
 #[test]
+fn elementwise_layers() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    let a = ts.matrix(3, 3, 1, "A")?;
+    let b = ts.matrix(3, 3, 2, "B")?;
+
+    ts.write(a, &[ 8.,  1.,  3.,  1.,  9.,  7.,  1.,  3.,  0.])?;
+    ts.write(b, &[ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 
+                  10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
+
+    let add = ts.create_pass(&[Operation::InplaceAdd(a, b)])?;
+
+    ts.flow(add)?;
+
+    let mut output = [0.; 9];
+    ts.read(a, &mut output)?;
+
+    assert_eq!(output, [19.0, 14.0, 18.0, 18.0, 28.0, 28.0, 24.0, 28.0, 27.0]);
+
+    Ok(())
+}
+
+#[test]
 fn scalar_mul() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;

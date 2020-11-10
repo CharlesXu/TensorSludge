@@ -9,8 +9,13 @@ layout(binding = 1) readonly buffer Scalars {
     float scalars[];
 };
 
+layout(push_constant) uniform Consts {
+    uint scalar_layer_size;
+};
+
 void main() {
     uint gid = gl_GlobalInvocationID.x;
-    if (gid >= product.length()) return;
-    product[gid] += scalars[gid];
+    if (gid >= scalars.length()) return;
+    for (uint l = 0; l < scalars.length() / scalar_layer_size; l++)
+        product[gid] += scalars[gid + scalar_layer_size * l];
 }

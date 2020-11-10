@@ -20,6 +20,7 @@ pub struct Invocation {
     pipeline_layout: vk::PipelineLayout,
     invocations: u32,
     pipeline: vk::Pipeline,
+    scalar_layer_size: u32,
 }
 
 const MULT_SHADER_PATH: &str = "shaders/elem_mult.comp.spv";
@@ -75,8 +76,14 @@ impl ElementwiseArithmetic {
 
         // Pipelines
         let descriptor_set_layouts = [descriptor_set_layout];
+        let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
+            .stage_flags(vk::ShaderStageFlags::COMPUTE)
+            .offset(0)
+            .size(std::mem::size_of::<u32>() as u32)];
         let create_info =
-            vk::PipelineLayoutCreateInfoBuilder::new().set_layouts(&descriptor_set_layouts);
+            vk::PipelineLayoutCreateInfoBuilder::new()
+            .set_layouts(&descriptor_set_layouts)
+            .push_constant_ranges(&push_constant_ranges);
         let pipeline_layout =
             unsafe { core.device.create_pipeline_layout(&create_info, None, None) }.result()?;
 
@@ -197,13 +204,15 @@ impl ElementwiseArithmetic {
             )
         };
 
-        let invocations = ((product.rows() * scalars.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        ensure!(product.layers() == 1, "Elementwise arithmetic output ({}) must have only one layer!", product.name());
+        let invocations = ((scalars.rows() * scalars.cols() * scalars.layers()) as u32 / LOCAL_SIZE_X) + 1;
 
         Ok(Invocation {
             pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
             invocations,
+            scalar_layer_size: (scalars.rows() * scalars.cols()) as u32,
         })
     }
 }
@@ -218,6 +227,17 @@ impl crate::engine::Invocation for Invocation {
                 0,
                 &[self.descriptor_set],
                 &[],
+            );
+
+            let slice = [self.scalar_layer_size];
+            let constants: &[u8] = bytemuck::cast_slice(&slice);
+            device.cmd_push_constants(
+                command_buffer,
+                self.pipeline_layout,
+                vk::ShaderStageFlags::COMPUTE,
+                0,
+                constants.len() as u32,
+                constants.as_ptr() as _,
             );
 
             device.cmd_bind_pipeline(
