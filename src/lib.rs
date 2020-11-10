@@ -4,9 +4,9 @@ mod elem_arithmetic;
 mod engine;
 mod matrix;
 mod matrix_multiply;
-mod pass;
 mod scalar_ops;
 mod sigmoid;
+#[cfg(test)]
 mod tests;
 pub use engine::TensorSludge;
 

@@ -2,14 +2,13 @@ use crate::*;
 use anyhow::Result;
 use std::f32::EPSILON;
 
-#[cfg(test)]
 #[test]
 fn sigmoid() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;
     const COLS: usize = 300;
 
-    let matrix = ts.matrix(ROWS, COLS)?;
+    let matrix = ts.matrix(ROWS, COLS, "0")?;
 
     let pass = ts.create_pass(&[Operation::Sigmoid(matrix)])?;
 
@@ -34,14 +33,13 @@ fn sigmoid() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 #[test]
 fn sigmoid_deriv() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;
     const COLS: usize = 300;
 
-    let matrix = ts.matrix(ROWS, COLS)?;
+    let matrix = ts.matrix(ROWS, COLS, "0")?;
 
     let pass = ts.create_pass(&[Operation::SigmoidDerivative(matrix)])?;
 
@@ -66,16 +64,15 @@ fn sigmoid_deriv() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 #[test]
 fn matrix_multiply() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const IDENT_SIZE: usize = 3;
     const COLS: usize = 2;
 
-    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE)?;
-    let b = ts.matrix(IDENT_SIZE, COLS)?;
-    let output = ts.matrix(IDENT_SIZE, COLS)?;
+    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE, "Identity")?;
+    let b = ts.matrix(IDENT_SIZE, COLS, "B")?;
+    let output = ts.matrix(IDENT_SIZE, COLS, "Output")?;
 
     let pass = ts.create_pass(&[Operation::MatrixMultiply {
         left: identity,
@@ -111,14 +108,13 @@ fn matrix_multiply() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 #[test]
 fn matrix_multiply_transposes() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
-    let a = ts.matrix(3, 3)?;
-    let b = ts.matrix(3, 3)?;
-    let output = ts.matrix(3, 3)?;
+    let a = ts.matrix(3, 3, "A")?;
+    let b = ts.matrix(3, 3, "B")?;
+    let output = ts.matrix(3, 3, "Output")?;
 
     let none = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
@@ -128,7 +124,7 @@ fn matrix_multiply_transposes() -> Result<()> {
         right_transpose: false,
     }])?;
 
-    let aT = ts.create_pass(&[Operation::MatrixMultiply {
+    let a_t = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
         right: b,
         dst: output,
@@ -136,7 +132,7 @@ fn matrix_multiply_transposes() -> Result<()> {
         right_transpose: false,
     }])?;
 
-    let bT = ts.create_pass(&[Operation::MatrixMultiply {
+    let b_t = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
         right: b,
         dst: output,
@@ -144,7 +140,7 @@ fn matrix_multiply_transposes() -> Result<()> {
         right_transpose: true,
     }])?;
 
-    let aTbT = ts.create_pass(&[Operation::MatrixMultiply {
+    let a_t_b_t = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
         right: b,
         dst: output,
@@ -184,36 +180,35 @@ fn matrix_multiply_transposes() -> Result<()> {
     // A transpose
     let expected = [174., 186., 198., 213., 228., 243., 252., 270., 288.];
     reset_mats(&mut ts)?;
-    ts.flow(aT)?;
+    ts.flow(a_t)?;
     ts.read(output, &mut output_data)?;
     assert_eq!(output_data, expected);
 
     // B transpose
     let expected = [68., 86., 104., 167., 212., 257., 266., 338., 410.];
     reset_mats(&mut ts)?;
-    ts.flow(bT)?;
+    ts.flow(b_t)?;
     ts.read(output, &mut output_data)?;
     assert_eq!(output_data, expected);
 
     // Both transpose
     let expected = [138., 174., 210., 171., 216., 261., 204., 258., 312.];
     reset_mats(&mut ts)?;
-    ts.flow(aTbT)?;
+    ts.flow(a_t_b_t)?;
     ts.read(output, &mut output_data)?;
     assert_eq!(output_data, expected);
 
     Ok(())
 }
 
-#[cfg(test)]
 #[test]
 fn elementwise_ops() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;
     const COLS: usize = 100;
 
-    let a = ts.matrix(ROWS, COLS)?;
-    let b = ts.matrix(ROWS, COLS)?;
+    let a = ts.matrix(ROWS, COLS, "A")?;
+    let b = ts.matrix(ROWS, COLS, "B")?;
 
     let pass = ts.create_pass(&[
         Operation::InplaceAdd(a, b),
@@ -249,7 +244,6 @@ fn elementwise_ops() -> Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
 #[test]
 fn scalar_mul() -> Result<()> {
     let mut ts = TensorSludge::new()?;
@@ -257,7 +251,7 @@ fn scalar_mul() -> Result<()> {
     const COLS: usize = 300;
     const SCALAR: f32 = 1.5324;
 
-    let matrix = ts.matrix(ROWS, COLS)?;
+    let matrix = ts.matrix(ROWS, COLS, "0")?;
 
     let pass = ts.create_pass(&[Operation::ScalarMultiply(matrix, SCALAR)])?;
 
