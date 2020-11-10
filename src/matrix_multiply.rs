@@ -219,12 +219,11 @@ impl MatrixMultiply {
             }
         }
 
-        let mut push_constant_sizes = SizeConstants {
+        let push_constant_sizes = SizeConstants {
             a_dim: matrix_dims(a, a_transpose),
             b_dim: matrix_dims(b, b_transpose),
             out_dim: matrix_dims(dst, false),
         };
-        //push_constant_sizes.b_dim.trans ^= 1;
 
         Ok(Invocation {
             pipeline: self.pipeline,

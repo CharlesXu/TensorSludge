@@ -275,3 +275,63 @@ fn scalar_mul() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn matrix_layers() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+
+    let a = ts.matrix(3, 3, 2, "A")?;
+    let b = ts.matrix(3, 3, 2, "B")?;
+    let output = ts.matrix(3, 3, 2, "Output")?;
+
+    ts.write(
+        a,
+        &[
+        1., 2., 3., //
+        4., 5., 6., //
+        7., 8., 9., //
+        //
+        19., 20., 21., //
+        22., 23., 24., //
+        25., 26., 27., //
+        ],
+    )?;
+
+    ts.write(
+        b,
+        &[
+        10., 11., 12., //
+        13., 14., 15., //
+        16., 17., 18., //
+        //
+        28., 29., 30., //
+        31., 32., 33., //
+        34., 35., 36., //
+        ],
+    )?;
+
+    let pass = ts.create_pass(&[Operation::MatrixMultiply {
+        left: a,
+        right: b,
+        dst: output,
+        left_transpose: false,
+        right_transpose: false,
+    }])?;
+
+    ts.flow(pass)?;
+    let mut output_data = [0.; 3 * 3 * 2];
+    ts.read(output, &mut output_data)?;
+
+    let expected = [
+        84., 90., 96., //
+        201., 216., 231., //
+        318., 342., 366., //
+        //
+        1866., 1926., 1986., //
+        2145., 2214., 2283., //
+        2424., 2502., 2580., //
+    ];
+    assert_eq!(output_data, expected);
+
+    Ok(())
+}

@@ -78,7 +78,7 @@ impl Matrix {
     }
 
     fn chk_buf_mismatch(&self, buf: &[f32]) -> Result<()> {
-        let mat_len = self.rows() * self.cols();
+        let mat_len = self.rows() * self.cols() * self.layers();
         if buf.len() != mat_len {
             bail!(
                 "Buffer of size {} does not match the length of data in matrix \"{}\", {}",
