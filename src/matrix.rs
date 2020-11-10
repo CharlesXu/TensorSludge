@@ -54,7 +54,7 @@ impl Matrix {
         self.cols
     }
 
-    pub fn allocation<'a>(&'a self) -> &'a Allocation<vk::Buffer> {
+    pub fn allocation(&self) -> &Allocation<vk::Buffer> {
         self.data.as_ref().unwrap()
     }
 

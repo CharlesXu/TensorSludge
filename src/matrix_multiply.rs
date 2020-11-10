@@ -185,7 +185,7 @@ impl MatrixMultiply {
                 out_cols,
             )
         }
-            
+
         Ok(Invocation {
             a_cols: a.cols() as u32,
             b_cols: b.cols() as u32,

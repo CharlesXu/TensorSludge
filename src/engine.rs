@@ -134,7 +134,12 @@ impl TensorSludge {
     }
 
     /// Create a new matrix with the specified dimensions
-    pub fn matrix(&mut self, rows: usize, cols: usize, name: impl Into<String>) -> Result<crate::Matrix> {
+    pub fn matrix(
+        &mut self,
+        rows: usize,
+        cols: usize,
+        name: impl Into<String>,
+    ) -> Result<crate::Matrix> {
         Ok(crate::Matrix(self.matrices.insert(Matrix::new(
             rows,
             cols,
@@ -143,7 +148,7 @@ impl TensorSludge {
         )?)))
     }
 
-    fn get_matrix_mut<'a>(&'a mut self, matrix: crate::Matrix) -> Result<&'a mut Matrix> {
+    fn get_matrix_mut(&mut self, matrix: crate::Matrix) -> Result<&mut Matrix> {
         self.matrices
             .get_mut(matrix.0)
             .context("Matrix was deleted")
