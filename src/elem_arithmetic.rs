@@ -220,15 +220,15 @@ impl ElementwiseArithmetic {
         );
         */
 
-        let invocations =
-            ((scalars.rows() * scalars.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        let layer_size = (scalars.rows() * scalars.cols()) as u32;
+        let invocations = layer_size / LOCAL_SIZE_X + 1;
 
         Ok(Invocation {
             pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
             invocations,
-            layer_size: (scalars.rows() * scalars.cols()) as u32,
+            layer_size,
         })
     }
 }

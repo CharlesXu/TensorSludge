@@ -15,7 +15,7 @@ layout(push_constant) uniform Consts {
 
 void main() {
     uint gid = gl_GlobalInvocationID.x;
-    if (gid >= min(scalars.length(), product.length())) return;
+    if (gid >= layer_size) return;
     uint product_layers = product.length() / layer_size;
     uint scalar_layers = scalars.length() / layer_size;
 
