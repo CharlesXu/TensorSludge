@@ -7,6 +7,7 @@ use std::ffi::CString;
 
 const LOCAL_SIZE_X: u32 = 16;
 const LOCAL_SIZE_Y: u32 = 16;
+const LOCAL_SIZE_Z: u32 = 4;
 
 pub struct MatrixMultiply {
     pipeline: vk::Pipeline,
@@ -19,15 +20,32 @@ pub struct MatrixMultiply {
 pub struct Invocation {
     descriptor_set: vk::DescriptorSet,
     pipeline_layout: vk::PipelineLayout,
-    a_cols: u32,   // Number of cols in a
-    b_cols: u32,   // Number of cols in b
-    out_rows: u32, // Rows of in_a, product
-    out_cols: u32, // Columns of in_b, product
-    inner_rc: u32, // Columns of in_a, Rows of in_B
-    a_transpose: bool,
-    b_transpose: bool,
     pipeline: vk::Pipeline,
+    push_constant_sizes: SizeConstants,
 }
+
+#[repr(C)]
+#[derive(Default, Copy, Clone)]
+struct MatrixDims {
+    cols: u32,
+    rows: u32,
+    layers: u32,
+    trans: u32,
+}
+
+#[repr(C)]
+#[derive(Default, Copy, Clone)]
+struct SizeConstants {
+    a_dim: MatrixDims,
+    b_dim: MatrixDims,
+    out_dim: MatrixDims,
+}
+
+unsafe impl bytemuck::Zeroable for MatrixDims {}
+unsafe impl bytemuck::Pod for MatrixDims {}
+
+unsafe impl bytemuck::Zeroable for SizeConstants {}
+unsafe impl bytemuck::Pod for SizeConstants {}
 
 impl MatrixMultiply {
     pub fn new(core: SharedCore) -> Result<Self> {
@@ -66,11 +84,14 @@ impl MatrixMultiply {
         let shader_module =
             unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
 
+
         // Pipeline
+        const PUSH_CONSTANT_SIZES: usize = std::mem::size_of::<SizeConstants>();
+        assert_eq!(PUSH_CONSTANT_SIZES, std::mem::size_of::<[u32; 4 * 3]>());
         let push_constant_ranges = [vk::PushConstantRangeBuilder::new()
             .stage_flags(vk::ShaderStageFlags::COMPUTE)
             .offset(0)
-            .size(std::mem::size_of::<[u32; 7]>() as u32)];
+            .size(PUSH_CONSTANT_SIZES as u32)];
 
         let descriptor_set_layouts = [descriptor_set_layout];
         let create_info = vk::PipelineLayoutCreateInfoBuilder::new()
@@ -157,46 +178,59 @@ impl MatrixMultiply {
             )
         };
 
-        let out_rows = if a_transpose { a.cols() } else { a.rows() } as u32;
-        let out_cols = if b_transpose { b.rows() } else { b.cols() } as u32;
+        let okay = match (a_transpose, b_transpose) {
+            (false, false) => a.cols() == b.rows(),
+            (false, true) => a.cols() == b.cols(),
+            (true, false) => a.rows() == b.rows(),
+            (true, true) => a.rows() == b.cols(),
+        };
 
-        let a_cols = if a_transpose { a.rows() } else { a.cols() } as u32;
-        let b_rows = if b_transpose { b.cols() } else { b.rows() } as u32;
-
-        if a_cols != b_rows {
-            bail!("Cannot multiply; Matrix \"{}\"'s columns ({}) do not equal matrix \"{}\"'s rows ({})",
-                a.name(),
-                a_cols,
-                b.name(),
-                b_rows
-            )
-        }
-
-        let inner_rc = if b_transpose { b.cols() } else { b.rows() } as u32;
-
-        if dst.cols() as u32 != out_cols || dst.rows() as u32 != out_rows {
-            bail!("Output matrix \"{}\" ({}x{}) does not have the dimensions to store the multiplication of \"{}\" and \"{}\", whose size is ({}x{})",
-                dst.name(),
-                dst.rows(),
-                dst.cols(),
+        if !okay {
+            bail!("Cannot multiply; Matrix dimension mismatch between \"{}\" and \"{}\"",
                 a.name(),
                 b.name(),
-                out_rows,
-                out_cols,
-            )
+            );
         }
+
+        let outer_dims = match (a_transpose, b_transpose) {
+            (false, false) => (a.rows(), b.cols()),
+            (false, true) => (a.rows(), b.rows()),
+            (true, false) => (a.cols(), b.cols()),
+            (true, true) => (a.cols(), b.rows()),
+        };
+
+        let out_trans = false;
+        let output_dims = if out_trans {
+            (dst.cols(), dst.rows())
+        } else {
+            (dst.rows(), dst.cols())
+        };
+
+        if outer_dims != output_dims {
+            bail!("Output matrix \"{}\" size incompatible.", dst.name());
+        }
+
+        fn matrix_dims(matrix: &Matrix, trans: bool) -> MatrixDims {
+            MatrixDims {
+                rows: matrix.rows() as _,
+                cols: matrix.cols() as _,
+                layers: matrix.layers() as _,
+                trans: if trans { 1 } else { 0 },
+            }
+        }
+
+        let mut push_constant_sizes = SizeConstants {
+            a_dim: matrix_dims(a, a_transpose),
+            b_dim: matrix_dims(b, b_transpose),
+            out_dim: matrix_dims(dst, false),
+        };
+        //push_constant_sizes.b_dim.trans ^= 1;
 
         Ok(Invocation {
-            a_cols: a.cols() as u32,
-            b_cols: b.cols() as u32,
             pipeline: self.pipeline,
             pipeline_layout: self.pipeline_layout,
             descriptor_set,
-            a_transpose,
-            b_transpose,
-            out_rows,
-            out_cols,
-            inner_rc,
+            push_constant_sizes,
         })
     }
 }
@@ -204,16 +238,8 @@ impl MatrixMultiply {
 impl crate::engine::Invocation for Invocation {
     fn dispatch(&self, device: &DeviceLoader, command_buffer: vk::CommandBuffer) {
         unsafe {
-            let constants = [
-                self.a_cols,
-                self.b_cols,
-                self.out_rows,
-                self.out_cols,
-                self.inner_rc,
-                if self.a_transpose { 1 } else { 0 },
-                if self.b_transpose { 1 } else { 0 },
-            ];
-            let constants: &[u8] = bytemuck::cast_slice(&constants[..]);
+            let slice = [self.push_constant_sizes];
+            let constants: &[u8] = bytemuck::cast_slice(&slice);
             device.cmd_push_constants(
                 command_buffer,
                 self.pipeline_layout,
@@ -238,10 +264,18 @@ impl crate::engine::Invocation for Invocation {
                 self.pipeline,
             );
 
-            let invocations_x = (self.out_cols as u32 / LOCAL_SIZE_X) + 1;
-            let invocations_y = (self.out_rows as u32 / LOCAL_SIZE_Y) + 1;
+            let abbrev = &self.push_constant_sizes.out_dim;
+            let (x, y) = if self.push_constant_sizes.out_dim.trans == 0 {
+                (abbrev.rows, abbrev.cols)
+            } else {
+                (abbrev.cols, abbrev.rows)
+            };
 
-            device.cmd_dispatch(command_buffer, invocations_x, invocations_y, 1);
+            let invocations_x = (x / LOCAL_SIZE_X) + 1;
+            let invocations_y = (y / LOCAL_SIZE_Y) + 1;
+            let invocations_z = (abbrev.layers / LOCAL_SIZE_Z) + 1;
+
+            device.cmd_dispatch(command_buffer, invocations_x, invocations_y, invocations_z);
         }
     }
 }

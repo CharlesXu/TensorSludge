@@ -8,8 +8,9 @@ A small, GPU-accelerated neural net library I've built from scratch in order to 
 - [X] Elementwise addition, multiplication, subtraction
 - [X] Scalar multiplication
 - [X] Automatic synchronization between operations
-- [ ] GPU-only matricies
 - [ ] Batches of size >1
+- [ ] Batch sum
+- [ ] GPU-only matricies
 - [ ] Softmax, and derivative
 - [ ] Models, saving and loading
 - [ ] Crossentropy, MSE, etc.

@@ -8,7 +8,7 @@ fn sigmoid() -> Result<()> {
     const ROWS: usize = 300;
     const COLS: usize = 300;
 
-    let matrix = ts.matrix(ROWS, COLS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
 
     let pass = ts.create_pass(&[Operation::Sigmoid(matrix)])?;
 
@@ -39,7 +39,7 @@ fn sigmoid_deriv() -> Result<()> {
     const ROWS: usize = 300;
     const COLS: usize = 300;
 
-    let matrix = ts.matrix(ROWS, COLS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
 
     let pass = ts.create_pass(&[Operation::SigmoidDerivative(matrix)])?;
 
@@ -70,9 +70,9 @@ fn matrix_multiply() -> Result<()> {
     const IDENT_SIZE: usize = 3;
     const COLS: usize = 2;
 
-    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE, "Identity")?;
-    let b = ts.matrix(IDENT_SIZE, COLS, "B")?;
-    let output = ts.matrix(IDENT_SIZE, COLS, "Output")?;
+    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE, 1, "Identity")?;
+    let b = ts.matrix(IDENT_SIZE, COLS, 1, "B")?;
+    let output = ts.matrix(IDENT_SIZE, COLS, 1, "Output")?;
 
     let pass = ts.create_pass(&[Operation::MatrixMultiply {
         left: identity,
@@ -112,9 +112,9 @@ fn matrix_multiply() -> Result<()> {
 fn matrix_multiply_transposes() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
-    let a = ts.matrix(3, 3, "A")?;
-    let b = ts.matrix(3, 3, "B")?;
-    let output = ts.matrix(3, 3, "Output")?;
+    let a = ts.matrix(3, 3, 1, "A")?;
+    let b = ts.matrix(3, 3, 1, "B")?;
+    let output = ts.matrix(3, 3, 1, "Output")?;
 
     let none = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
@@ -207,8 +207,8 @@ fn elementwise_ops() -> Result<()> {
     const ROWS: usize = 300;
     const COLS: usize = 100;
 
-    let a = ts.matrix(ROWS, COLS, "A")?;
-    let b = ts.matrix(ROWS, COLS, "B")?;
+    let a = ts.matrix(ROWS, COLS, 1, "A")?;
+    let b = ts.matrix(ROWS, COLS, 1, "B")?;
 
     let pass = ts.create_pass(&[
         Operation::InplaceAdd(a, b),
@@ -251,7 +251,7 @@ fn scalar_mul() -> Result<()> {
     const COLS: usize = 300;
     const SCALAR: f32 = 1.5324;
 
-    let matrix = ts.matrix(ROWS, COLS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
 
     let pass = ts.create_pass(&[Operation::ScalarMultiply(matrix, SCALAR)])?;
 

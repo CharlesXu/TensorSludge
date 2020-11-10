@@ -138,11 +138,13 @@ impl TensorSludge {
         &mut self,
         rows: usize,
         cols: usize,
+        layers: usize,
         name: impl Into<String>,
     ) -> Result<crate::Matrix> {
         Ok(crate::Matrix(self.matrices.insert(Matrix::new(
             rows,
             cols,
+            layers,
             name,
             self.core.clone(),
         )?)))

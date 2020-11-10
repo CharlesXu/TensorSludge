@@ -1,5 +1,5 @@
 use crate::engine::SharedCore;
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use erupt::{
     utils::allocator::{Allocation, MappedMemory, MemoryTypeFinder},
     vk1_0 as vk,
@@ -8,6 +8,7 @@ use erupt::{
 pub struct Matrix {
     rows: usize,
     cols: usize,
+    layers: usize,
     data: Option<Allocation<vk::Buffer>>,
     core: SharedCore,
     name: String,
@@ -17,11 +18,15 @@ impl Matrix {
     pub fn new(
         rows: usize,
         cols: usize,
+        layers: usize,
         name: impl Into<String>,
         core: SharedCore,
     ) -> Result<Self> {
+        ensure!(rows > 0, "Rows must be nonzero!");
+        ensure!(cols > 0, "Cols must be nonzero!");
+        ensure!(layers > 0, "Layers must be nonzero!");
         let name = name.into();
-        let buffer_size = cols * rows * std::mem::size_of::<f32>();
+        let buffer_size = layers * cols * rows * std::mem::size_of::<f32>();
         let create_info = vk::BufferCreateInfoBuilder::new()
             .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -40,6 +45,7 @@ impl Matrix {
         Ok(Self {
             rows,
             cols,
+            layers,
             data,
             core,
             name,
@@ -52,6 +58,10 @@ impl Matrix {
 
     pub fn cols(&self) -> usize {
         self.cols
+    }
+
+    pub fn layers(&self) -> usize {
+        self.layers
     }
 
     pub fn allocation(&self) -> &Allocation<vk::Buffer> {

@@ -1,5 +1,5 @@
 #version 450
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = 16, local_size_y = 16, local_size_z = 4) in;
 
 layout(binding = 0) readonly buffer InA {
     float in_a[];
@@ -13,69 +13,39 @@ layout(binding = 2) writeonly buffer Product {
     float product[];
 };
 
-layout(push_constant) uniform Sizes {
-    uint a_cols;
-    uint b_cols;
-    uint out_rows; // Rows of in_a, product
-    uint out_cols; // Columns of in_b, product
-    uint inner_rc; /// Columns of in_a, Rows of in_B
-    uint transpose_a; // Multiply as if in_a was transposed
-    uint transpose_b; // Multiply as if in_b was transposed
+struct MatrixDims {
+    uint cols;
+    uint rows;
+    uint layers;
+    uint trans;
 };
 
-uvec2 gid = gl_GlobalInvocationID.xy;
+layout(push_constant) uniform Sizes {
+    MatrixDims a_dim;
+    MatrixDims b_dim;
+    MatrixDims out_dim;
+};
 
-float matmul();
-float matmul_aT();
-float matmul_bT();
-float matmul_aTbT();
+uvec3 gid = gl_GlobalInvocationID;
+
+uint mat_idx(MatrixDims dim, uint row, uint col) {
+    uint base = (gid.z % dim.layers) * (dim.cols * dim.rows); // Index by layer 
+    if (bool(dim.trans)) {
+        base += (row * dim.cols) + col;
+    } else {
+        base += (col * dim.cols) + row;
+    }
+    return base;
+}
 
 void main() {
-    if (gid.x >= out_cols || gid.y >= out_rows) return;
-    uint output_idx = gid.y * out_cols + gid.x;
-    if (bool(transpose_a)) {
-        if (bool(transpose_b)) {
-            product[output_idx] = matmul_aTbT();
-        } else {
-            product[output_idx] = matmul_aT();
-        }
-    } else {
-        if (bool(transpose_b)) {
-            product[output_idx] = matmul_bT();
-        } else {
-            product[output_idx] = matmul();
-        }
-    }
-}
+    if (gid.x >= out_dim.cols || gid.y >= out_dim.rows || gid.z >= out_dim.layers) return;
 
-float matmul() {
+    uint inner_rc = bool(a_dim.trans) ? a_dim.cols : a_dim.rows;
+
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * a_cols + i] * in_b[i * b_cols + gid.x];
+        sum += in_a[mat_idx(a_dim, i, gid.y)] * in_b[mat_idx(b_dim, gid.x, i)];
     }
-    return sum;
-}
-
-float matmul_aT() {
-    float sum = 0.;
-    for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + a_cols * i] * in_b[i * b_cols + gid.x];
-    }
-    return sum;
-}
-
-float matmul_bT() {
-    float sum = 0.;
-    for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y * a_cols + i] * in_b[i + b_cols * gid.x];
-    }
-    return sum;
-}
-
-float matmul_aTbT() {
-    float sum = 0.;
-    for (uint i = 0; i < inner_rc; i++) {
-        sum += in_a[gid.y + a_cols * i] * in_b[i + b_cols * gid.x];
-    }
-    return sum;
+    product[mat_idx(out_dim, gid.x, gid.y)] = sum;
 }
