@@ -177,7 +177,7 @@ impl TensorSludge {
         let src = self.get_matrix(src).context("SRC was deleted")?;
         let dst = self.get_matrix(dst).context("DST was deleted")?;
         ensure!(src.size() == dst.size(), "Source and destination sizes must match exactly for transfer");
-        let size = src.size();
+        let size = src.size_bytes();
         let src = *src.allocation().object();
         let dst = *dst.allocation().object();
 

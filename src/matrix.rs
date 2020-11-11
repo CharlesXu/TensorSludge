@@ -82,6 +82,10 @@ impl Matrix {
         self.rows() * self.cols() * self.layers()
     }
 
+    pub fn size_bytes(&self) -> usize {
+        self.rows() * self.cols() * self.layers() * std::mem::size_of::<f32>()
+    }
+
     pub fn allocation(&self) -> &Allocation<vk::Buffer> {
         self.data.as_ref().unwrap()
     }
