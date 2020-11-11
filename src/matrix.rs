@@ -30,7 +30,11 @@ impl Matrix {
         let name = name.into();
         let buffer_size = layers * cols * rows * std::mem::size_of::<f32>();
         let create_info = vk::BufferCreateInfoBuilder::new()
-            .usage(vk::BufferUsageFlags::STORAGE_BUFFER)
+            .usage(
+                vk::BufferUsageFlags::STORAGE_BUFFER
+                    | vk::BufferUsageFlags::TRANSFER_SRC
+                    | vk::BufferUsageFlags::TRANSFER_DST,
+            )
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .size(buffer_size as u64);
 
@@ -40,10 +44,14 @@ impl Matrix {
         let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
         let data = core
             .allocator()?
-            .allocate(&core.device, buffer, match cpu_visible {
-                true => MemoryTypeFinder::dynamic(),
-                false => MemoryTypeFinder::gpu_only(),
-            })
+            .allocate(
+                &core.device,
+                buffer,
+                match cpu_visible {
+                    true => MemoryTypeFinder::dynamic(),
+                    false => MemoryTypeFinder::gpu_only(),
+                },
+            )
             .result()?;
         let data = Some(data);
 
@@ -101,7 +109,9 @@ impl Matrix {
     }
 
     pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
-        if !self.cpu_visible { bail!("Cannot read from GPU-only matrix \"{}\"", self.name()); }
+        if !self.cpu_visible {
+            bail!("Cannot read from GPU-only matrix \"{}\"", self.name());
+        }
         self.chk_buf_mismatch(buf)?;
         let mapping = self.map()?;
         buf.copy_from_slice(&bytemuck::cast_slice(mapping.read())[..buf.len()]);
@@ -110,7 +120,9 @@ impl Matrix {
     }
 
     pub fn write(&mut self, buf: &[f32]) -> Result<()> {
-        if !self.cpu_visible { bail!("Cannot write to GPU-only matrix \"{}\"", self.name()); }
+        if !self.cpu_visible {
+            bail!("Cannot write to GPU-only matrix \"{}\"", self.name());
+        }
         self.chk_buf_mismatch(buf)?;
         let mut mapping = self.map()?;
         mapping.import(bytemuck::cast_slice(buf));

@@ -11,9 +11,12 @@ fn random_weights(
     ts: &mut TensorSludge,
     rng: &mut impl Rng,
 ) -> Result<()> {
+    let tmp = ts.matrix(size, 1, 1, true, "rand_tmp")?;
     let unif = Uniform::new(-1., 1.);
     let buf = unif.sample_iter(rng).take(size).collect::<Vec<f32>>();
-    ts.write(mat, &buf)
+    ts.write(tmp, &buf)?;
+    ts.transfer(tmp, mat)?;
+    Ok(())
 }
 
 fn softmax(data: &mut [f32]) {
@@ -42,17 +45,17 @@ fn main() -> Result<()> {
     // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1, BATCH_SIZE, true, "input_layer")?;
 
-    let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE, 1, true, "weights_l0")?;
+    let weights_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE, 1, false, "weights_l0")?;
     let activations_l0 = ts.matrix(HIDDEN_L1, 1, BATCH_SIZE, false, "activations_l0")?;
     let grad_l0 = ts.matrix(HIDDEN_L1, IMG_SIZE, BATCH_SIZE, false, "grad_l0")?;
     let error_l0 = ts.matrix(HIDDEN_L1, 1, BATCH_SIZE, false, "error_l0")?;
 
-    let weights_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1, 1, true, "weights_l1")?;
+    let weights_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1, 1, false, "weights_l1")?;
     let activations_l1 = ts.matrix(HIDDEN_L2, 1, BATCH_SIZE, false, "activations_l1")?;
     let grad_l1 = ts.matrix(HIDDEN_L2, HIDDEN_L1, BATCH_SIZE, false, "grad_l1")?;
     let error_l1 = ts.matrix(HIDDEN_L2, 1, BATCH_SIZE, false, "error_l1")?;
 
-    let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2, 1, true, "weights_l2")?;
+    let weights_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2, 1, false, "weights_l2")?;
     let grad_l2 = ts.matrix(OUTPUT_SIZE, HIDDEN_L2, BATCH_SIZE, false, "grad_l2")?;
     let output_error_layer = ts.matrix(OUTPUT_SIZE, 1, BATCH_SIZE, true, "output_error_layer")?;
     let output_layer = ts.matrix(OUTPUT_SIZE, 1, BATCH_SIZE, true, "output_layer")?;

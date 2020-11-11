@@ -4,7 +4,7 @@ use crate::matrix_multiply::MatrixMultiply;
 use crate::scalar_ops::ScalarOps;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{bail, format_err, ensure, Context, Result};
 use erupt::{
     cstr,
     utils::{
@@ -22,6 +22,7 @@ use std::sync::{Arc, Mutex};
 /// The TensorSludge engine
 pub struct TensorSludge {
     command_pool: vk::CommandPool,
+    transfer_command_buffer: vk::CommandBuffer,
     passes: GenMap<Pass>,
     matrices: GenMap<Matrix>,
     sigmoid: Sigmoid,
@@ -104,7 +105,7 @@ impl TensorSludge {
         // Command pool:
         let create_info = vk::CommandPoolCreateInfoBuilder::new()
             .queue_family_index(queue_family_index)
-            .flags(vk::CommandPoolCreateFlags::empty());
+            .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
         let command_pool =
             unsafe { device.create_command_pool(&create_info, None, None) }.result()?;
 
@@ -120,7 +121,16 @@ impl TensorSludge {
         let elem_arithmetic = ElementwiseArithmetic::new(core.clone())?;
         let scalar_ops = ScalarOps::new(core.clone())?;
 
+        let allocate_info = vk::CommandBufferAllocateInfoBuilder::new()
+            .command_pool(command_pool)
+            .level(vk::CommandBufferLevel::PRIMARY)
+            .command_buffer_count(1);
+
+        let transfer_command_buffer =
+            unsafe { core.device.allocate_command_buffers(&allocate_info) }.result()?[0];
+
         Ok(Self {
+            transfer_command_buffer,
             command_pool,
             matrix_multiply,
             elem_arithmetic,
@@ -158,11 +168,35 @@ impl TensorSludge {
             .context("Matrix was deleted")
     }
 
-    /*
-    fn get_matrix<'a>(&'a self, matrix: crate::Matrix) -> Result<&'a Matrix> {
+    fn get_matrix(&self, matrix: crate::Matrix) -> Result<&Matrix> {
         self.matrices.get(matrix.0).context("Matrix was deleted")
     }
-    */
+
+    /// Transfer data between matrices of equal sizes
+    pub fn transfer(&mut self, src: crate::Matrix, dst: crate::Matrix) -> Result<()> {
+        let src = self.get_matrix(src).context("SRC was deleted")?;
+        let dst = self.get_matrix(dst).context("DST was deleted")?;
+        ensure!(src.size() == dst.size(), "Source and destination sizes must match exactly for transfer");
+        let size = src.size();
+        let src = *src.allocation().object();
+        let dst = *dst.allocation().object();
+
+        let region = vk::BufferCopyBuilder::new()
+            .src_offset(0)
+            .dst_offset(0)
+            .size(size as _);
+
+        unsafe {
+            self.core.device.reset_command_buffer(self.transfer_command_buffer, None).result()?;
+            let begin_info = vk::CommandBufferBeginInfoBuilder::new();
+            self.core.device.begin_command_buffer(self.transfer_command_buffer, &begin_info).result()?;
+            self.core.device.cmd_copy_buffer(self.transfer_command_buffer, src, dst, &[region]);
+            self.core.device.end_command_buffer(self.transfer_command_buffer).result()?;
+            self.core.device.queue_wait_idle(self.queue).result()?;
+        }
+
+        Ok(())
+    }
 
     /// Write data to a matrix in row-major order
     pub fn write(&mut self, matrix: crate::Matrix, data: &[f32]) -> Result<()> {
