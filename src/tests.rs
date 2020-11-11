@@ -7,12 +7,13 @@ fn sigmoid() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;
     const COLS: usize = 300;
+    const LAYERS: usize = 2;
 
-    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
 
     let pass = ts.create_pass(&[Operation::Sigmoid(matrix)])?;
 
-    let data = (1..=ROWS * COLS)
+    let data = (1..=ROWS * COLS * LAYERS)
         .map(|v| v as f32)
         .into_iter()
         .collect::<Vec<_>>();
@@ -21,7 +22,7 @@ fn sigmoid() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut output = [0.; ROWS * COLS];
+    let mut output = [0.; ROWS * COLS * LAYERS];
     ts.read(matrix, &mut output)?;
 
     assert!(data
@@ -36,14 +37,15 @@ fn sigmoid() -> Result<()> {
 #[test]
 fn sigmoid_deriv() -> Result<()> {
     let mut ts = TensorSludge::new()?;
-    const ROWS: usize = 300;
-    const COLS: usize = 300;
+    const ROWS: usize = 30;
+    const COLS: usize = 30;
+    const LAYERS: usize = 2;
 
-    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
 
     let pass = ts.create_pass(&[Operation::SigmoidDerivative(matrix)])?;
 
-    let data = (1..=ROWS * COLS)
+    let data = (1..=ROWS * COLS * LAYERS)
         .map(|v| v as f32)
         .into_iter()
         .collect::<Vec<_>>();
@@ -52,14 +54,14 @@ fn sigmoid_deriv() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut output = [0.; ROWS * COLS];
+    let mut output = [0.; ROWS * COLS * LAYERS];
     ts.read(matrix, &mut output)?;
 
     assert!(data
         .iter()
         .map(|v| v * (1. - v))
         .zip(output.iter())
-        .all(|(a, &b)| (a - b).abs() < EPSILON));
+        .all(|(a, &b)| dbg!(dbg!(a) - dbg!(b)).abs() < EPSILON));
 
     Ok(())
 }

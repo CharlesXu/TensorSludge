@@ -144,7 +144,7 @@ impl Sigmoid {
             )
         };
 
-        let invocations = ((matrix.rows() * matrix.cols()) as u32 / LOCAL_SIZE_X) + 1;
+        let invocations = (matrix.size() as u32 / LOCAL_SIZE_X) + 1;
 
         Ok(Invocation {
             pipeline,

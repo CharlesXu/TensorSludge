@@ -64,6 +64,10 @@ impl Matrix {
         self.layers
     }
 
+    pub fn size(&self) -> usize {
+        self.rows() * self.cols() * self.layers()
+    }
+
     pub fn allocation(&self) -> &Allocation<vk::Buffer> {
         self.data.as_ref().unwrap()
     }
@@ -78,13 +82,12 @@ impl Matrix {
     }
 
     fn chk_buf_mismatch(&self, buf: &[f32]) -> Result<()> {
-        let mat_len = self.rows() * self.cols() * self.layers();
-        if buf.len() != mat_len {
+        if buf.len() != self.size() {
             bail!(
                 "Buffer of size {} does not match the length of data in matrix \"{}\", {}",
                 buf.len(),
                 self.name,
-                mat_len
+                self.size(),
             )
         } else {
             Ok(())
