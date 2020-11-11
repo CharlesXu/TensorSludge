@@ -284,13 +284,14 @@ fn scalar_mul() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const ROWS: usize = 300;
     const COLS: usize = 300;
+    const LAYERS: usize = 3;
     const SCALAR: f32 = 1.5324;
 
-    let matrix = ts.matrix(ROWS, COLS, 1, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
 
     let pass = ts.create_pass(&[Operation::ScalarMultiply(matrix, SCALAR)])?;
 
-    let data = (1..=ROWS * COLS)
+    let data = (1..=ROWS * COLS * LAYERS)
         .map(|v| v as f32)
         .into_iter()
         .collect::<Vec<_>>();
@@ -299,7 +300,7 @@ fn scalar_mul() -> Result<()> {
 
     ts.flow(pass)?;
 
-    let mut output = [0.; ROWS * COLS];
+    let mut output = vec![0.; ROWS * COLS * LAYERS];
     ts.read(matrix, &mut output)?;
 
     assert!(data
