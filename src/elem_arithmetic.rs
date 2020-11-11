@@ -132,6 +132,8 @@ impl ElementwiseArithmetic {
                 .destroy_shader_module(Some(mult_shader_module), None);
             core.device
                 .destroy_shader_module(Some(add_shader_module), None);
+            core.device
+                .destroy_shader_module(Some(sub_shader_module), None);
         }
 
         // Create descriptor set allocator
@@ -278,7 +280,11 @@ impl Drop for ElementwiseArithmetic {
                 .destroy_pipeline(Some(self.add_pipeline), None);
             self.core
                 .device
-                .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
+                .destroy_pipeline(Some(self.sub_pipeline), None);
+            self.core
+                .device
+                .destroy_pipeline_layout(Some(self.pipeline_layout), None);
+            self.core.device.destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
         }
     }
 }

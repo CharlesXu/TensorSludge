@@ -37,7 +37,7 @@ fn main() -> Result<()> {
     const HIDDEN_L1: usize = 128;
     const HIDDEN_L2: usize = 64;
     const OUTPUT_SIZE: usize = 10;
-    const BATCH_SIZE: usize = 1;
+    const BATCH_SIZE: usize = 10;
 
     // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1, BATCH_SIZE, "input_layer")?;
@@ -151,16 +151,16 @@ fn main() -> Result<()> {
     let backward_pass = ts.create_pass(&backward_pass)?;
 
     // Intermediate, re-used buffers
-    let mut input_buf = vec![0.; IMG_SIZE];
-    let mut output_buf = vec![0.; OUTPUT_SIZE];
+    let mut input_buf = vec![0.; IMG_SIZE * BATCH_SIZE];
+    let mut output_buf = vec![0.; OUTPUT_SIZE * BATCH_SIZE];
 
     // Training loop
     let mut num_correct = 0;
     let mut num_total = 0;
-    for (idx, (label, img)) in mnist
+    for (idx, (labels, img)) in mnist
         .trn_lbl
-        .iter()
-        .zip(mnist.trn_img.chunks_exact(IMG_SIZE))
+        .chunks_exact(BATCH_SIZE)
+        .zip(mnist.trn_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
         .enumerate()
     {
         // Feed forward
@@ -169,19 +169,21 @@ fn main() -> Result<()> {
         ts.flow(forward_pass)?;
         ts.read(output_layer, &mut output_buf)?;
 
-        if argmax(&output_buf) == *label as usize {
-            num_correct += 1;
+        for (outputs, label) in output_buf.chunks_exact_mut(OUTPUT_SIZE).zip(labels) {
+            if argmax(&outputs) == *label as usize {
+                num_correct += 1;
+            }
+            num_total += 1;
+
+            // Difference with train val
+            outputs[*label as usize] -= 1.;
         }
-        num_total += 1;
 
         if idx % 100 == 0 {
             println!("Accuracy: {}", num_correct as f32 / num_total as f32);
             num_correct = 0;
             num_total = 0;
         }
-
-        // Difference with train val
-        output_buf[*label as usize] -= 1.;
 
         // Softmax before backprop step
         softmax(&mut output_buf);
@@ -191,6 +193,7 @@ fn main() -> Result<()> {
         ts.flow(backward_pass)?;
     }
 
+    /*
     println!("Computing accuracy...");
     let mut num_correct = 0;
     let mut num_total = 0;
@@ -211,6 +214,7 @@ fn main() -> Result<()> {
     }
 
     println!("Accuracy: {}", num_correct as f32 / num_total as f32);
+    */
 
     Ok(())
 }

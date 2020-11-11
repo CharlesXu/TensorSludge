@@ -167,6 +167,7 @@ impl Drop for ScalarOps {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
+            self.core.device.destroy_pipeline_layout(Some(self.pipeline_layout), None);
             self.core
                 .device
                 .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);

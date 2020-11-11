@@ -24,12 +24,12 @@ pub struct TensorSludge {
     command_pool: vk::CommandPool,
     passes: GenMap<Pass>,
     matrices: GenMap<Matrix>,
-    core: SharedCore,
     sigmoid: Sigmoid,
     matrix_multiply: MatrixMultiply,
     elem_arithmetic: ElementwiseArithmetic,
     scalar_ops: ScalarOps,
     queue: vk::Queue,
+    core: SharedCore,
 }
 
 pub struct Core {
@@ -419,5 +419,18 @@ impl Core {
 }
 
 impl Drop for TensorSludge {
-    fn drop(&mut self) {}
+    fn drop(&mut self) {
+        unsafe {
+            self.core.device.destroy_command_pool(Some(self.command_pool), None);
+        }
+    }
+}
+
+impl Drop for Core {
+    fn drop(&mut self) {
+        unsafe { 
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
+        };
+    }
 }

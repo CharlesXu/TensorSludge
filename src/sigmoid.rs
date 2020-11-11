@@ -182,6 +182,7 @@ impl Drop for Sigmoid {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
+            self.core.device.destroy_pipeline_layout(Some(self.pipeline_layout), None);
             self.core
                 .device
                 .destroy_pipeline(Some(self.deriv_pipeline), None);
