@@ -12,6 +12,7 @@ pub struct Matrix {
     data: Option<Allocation<vk::Buffer>>,
     core: SharedCore,
     name: String,
+    cpu_visible: bool,
 }
 
 impl Matrix {
@@ -19,6 +20,7 @@ impl Matrix {
         rows: usize,
         cols: usize,
         layers: usize,
+        cpu_visible: bool,
         name: impl Into<String>,
         core: SharedCore,
     ) -> Result<Self> {
@@ -38,7 +40,10 @@ impl Matrix {
         let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
         let data = core
             .allocator()?
-            .allocate(&core.device, buffer, MemoryTypeFinder::dynamic())
+            .allocate(&core.device, buffer, match cpu_visible {
+                true => MemoryTypeFinder::dynamic(),
+                false => MemoryTypeFinder::gpu_only(),
+            })
             .result()?;
         let data = Some(data);
 
@@ -49,6 +54,7 @@ impl Matrix {
             data,
             core,
             name,
+            cpu_visible,
         })
     }
 
@@ -95,6 +101,7 @@ impl Matrix {
     }
 
     pub fn read(&mut self, buf: &mut [f32]) -> Result<()> {
+        if !self.cpu_visible { bail!("Cannot read from GPU-only matrix \"{}\"", self.name()); }
         self.chk_buf_mismatch(buf)?;
         let mapping = self.map()?;
         buf.copy_from_slice(&bytemuck::cast_slice(mapping.read())[..buf.len()]);
@@ -103,6 +110,7 @@ impl Matrix {
     }
 
     pub fn write(&mut self, buf: &[f32]) -> Result<()> {
+        if !self.cpu_visible { bail!("Cannot write to GPU-only matrix \"{}\"", self.name()); }
         self.chk_buf_mismatch(buf)?;
         let mut mapping = self.map()?;
         mapping.import(bytemuck::cast_slice(buf));
