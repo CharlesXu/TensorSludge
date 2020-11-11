@@ -192,6 +192,12 @@ impl TensorSludge {
             self.core.device.begin_command_buffer(self.transfer_command_buffer, &begin_info).result()?;
             self.core.device.cmd_copy_buffer(self.transfer_command_buffer, src, dst, &[region]);
             self.core.device.end_command_buffer(self.transfer_command_buffer).result()?;
+            let command_buffers = [self.transfer_command_buffer];
+            let submit_info = vk::SubmitInfoBuilder::new().command_buffers(&command_buffers);
+            self.core
+                .device
+                .queue_submit(self.queue, &[submit_info], None)
+                .result()?;
             self.core.device.queue_wait_idle(self.queue).result()?;
         }
 

@@ -4,9 +4,9 @@ use tensorsludge::*;
 fn main() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
-    let a = ts.matrix(3, 3, 1, "A")?;
-    let b = ts.matrix(3, 1, 1, "B")?;
-    let dst = ts.matrix(3, 1, 1, "Output")?;
+    let a = ts.matrix(3, 3, 1, true, "A")?;
+    let b = ts.matrix(3, 1, 1, true, "B")?;
+    let dst = ts.matrix(3, 1, 1, true, "Output")?;
 
     let pass = ts.create_pass(&[
         Operation::MatrixMultiply {

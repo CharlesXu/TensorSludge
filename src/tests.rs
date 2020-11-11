@@ -9,7 +9,7 @@ fn sigmoid() -> Result<()> {
     const COLS: usize = 300;
     const LAYERS: usize = 2;
 
-    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, true, "0")?;
 
     let pass = ts.create_pass(&[Operation::Sigmoid(matrix)])?;
 
@@ -41,7 +41,7 @@ fn sigmoid_deriv() -> Result<()> {
     const COLS: usize = 30;
     const LAYERS: usize = 2;
 
-    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, true, "0")?;
 
     let pass = ts.create_pass(&[Operation::SigmoidDerivative(matrix)])?;
 
@@ -72,9 +72,9 @@ fn matrix_multiply() -> Result<()> {
     const IDENT_SIZE: usize = 3;
     const COLS: usize = 2;
 
-    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE, 1, "Identity")?;
-    let b = ts.matrix(IDENT_SIZE, COLS, 1, "B")?;
-    let output = ts.matrix(IDENT_SIZE, COLS, 1, "Output")?;
+    let identity = ts.matrix(IDENT_SIZE, IDENT_SIZE, 1, true, "Identity")?;
+    let b = ts.matrix(IDENT_SIZE, COLS, 1, true, "B")?;
+    let output = ts.matrix(IDENT_SIZE, COLS, 1, true, "Output")?;
 
     let pass = ts.create_pass(&[Operation::MatrixMultiply {
         left: identity,
@@ -114,9 +114,9 @@ fn matrix_multiply() -> Result<()> {
 fn matrix_multiply_transposes() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
-    let a = ts.matrix(3, 3, 1, "A")?;
-    let b = ts.matrix(3, 3, 1, "B")?;
-    let output = ts.matrix(3, 3, 1, "Output")?;
+    let a = ts.matrix(3, 3, 1, true, "A")?;
+    let b = ts.matrix(3, 3, 1, true, "B")?;
+    let output = ts.matrix(3, 3, 1, true, "Output")?;
 
     let none = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
@@ -154,17 +154,17 @@ fn matrix_multiply_transposes() -> Result<()> {
         ts.write(
             a,
             &[
-                1., 2., 3., //
-                4., 5., 6., //
-                7., 8., 9., //
+            1., 2., 3., //
+            4., 5., 6., //
+            7., 8., 9., //
             ],
         )?;
         ts.write(
             b,
             &[
-                10., 11., 12., //
-                13., 14., 15., //
-                16., 17., 18., //
+            10., 11., 12., //
+            13., 14., 15., //
+            16., 17., 18., //
             ],
         )
     };
@@ -209,8 +209,8 @@ fn elementwise_ops() -> Result<()> {
     const ROWS: usize = 300;
     const COLS: usize = 100;
 
-    let a = ts.matrix(ROWS, COLS, 1, "A")?;
-    let b = ts.matrix(ROWS, COLS, 1, "B")?;
+    let a = ts.matrix(ROWS, COLS, 1, true, "A")?;
+    let b = ts.matrix(ROWS, COLS, 1, true, "B")?;
 
     let pass = ts.create_pass(&[
         Operation::InplaceAdd(a, b),
@@ -249,12 +249,12 @@ fn elementwise_ops() -> Result<()> {
 #[test]
 fn elementwise_layers() -> Result<()> {
     let mut ts = TensorSludge::new()?;
-    let a = ts.matrix(3, 3, 1, "A")?;
-    let b = ts.matrix(3, 3, 2, "B")?;
+    let a = ts.matrix(3, 3, 1, true, "A")?;
+    let b = ts.matrix(3, 3, 2, true, "B")?;
 
     ts.write(a, &[ 8.,  1.,  3.,  1.,  9.,  7.,  1.,  3.,  0.])?;
     ts.write(b, &[ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 
-                  10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
+        10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
 
     // One layer with two layers added to it
     let add = ts.create_pass(&[Operation::InplaceAdd(a, b)])?;
@@ -269,7 +269,7 @@ fn elementwise_layers() -> Result<()> {
     // Two layers with one layer added across both
     ts.write(a, &[ 8.,  1.,  3.,  1.,  9.,  7.,  1.,  3.,  0.])?;
     ts.write(b, &[ 1.,  2.,  3.,  4.,  5.,  6.,  7.,  8.,  9., 
-                  10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
+        10., 11., 12., 13., 14., 15., 16., 17., 18.])?;
     let add = ts.create_pass(&[Operation::InplaceAdd(b, a)])?;
     let mut output = [0.; 18];
     ts.flow(add)?;
@@ -287,7 +287,7 @@ fn scalar_mul() -> Result<()> {
     const LAYERS: usize = 3;
     const SCALAR: f32 = 1.5324;
 
-    let matrix = ts.matrix(ROWS, COLS, LAYERS, "0")?;
+    let matrix = ts.matrix(ROWS, COLS, LAYERS, true, "0")?;
 
     let pass = ts.create_pass(&[Operation::ScalarMultiply(matrix, SCALAR)])?;
 
@@ -316,44 +316,44 @@ fn scalar_mul() -> Result<()> {
 fn matrix_layers() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
-    let a = ts.matrix(3, 3, 2, "A")?;
-    let b = ts.matrix(3, 3, 2, "B")?;
-    let c = ts.matrix(3, 3, 1, "C")?;
-    let output = ts.matrix(3, 3, 2, "Output")?;
-    let output_single = ts.matrix(3, 3, 1, "Single output")?;
+    let a = ts.matrix(3, 3, 2, true, "A")?;
+    let b = ts.matrix(3, 3, 2, true, "B")?;
+    let c = ts.matrix(3, 3, 1, true, "C")?;
+    let output = ts.matrix(3, 3, 2, true, "Output")?;
+    let output_single = ts.matrix(3, 3, 1, true, "Single output")?;
 
     ts.write(
         a,
         &[
-            1., 2., 3., //
-            4., 5., 6., //
-            7., 8., 9., //
-            //
-            19., 20., 21., //
-            22., 23., 24., //
-            25., 26., 27., //
+        1., 2., 3., //
+        4., 5., 6., //
+        7., 8., 9., //
+        //
+        19., 20., 21., //
+        22., 23., 24., //
+        25., 26., 27., //
         ],
     )?;
 
     ts.write(
         b,
         &[
-            10., 11., 12., //
-            13., 14., 15., //
-            16., 17., 18., //
-            //
-            28., 29., 30., //
-            31., 32., 33., //
-            34., 35., 36., //
+        10., 11., 12., //
+        13., 14., 15., //
+        16., 17., 18., //
+        //
+        28., 29., 30., //
+        31., 32., 33., //
+        34., 35., 36., //
         ],
     )?;
 
     ts.write(
         c,
         &[
-            8., 7., 6., //
-            5., 4., 3., //
-            2., 1., 0., //
+        8., 7., 6., //
+        5., 4., 3., //
+        2., 1., 0., //
         ],
     )?;
 
@@ -424,6 +424,39 @@ fn matrix_layers() -> Result<()> {
         384., 306., 228., //
     ];
     assert_eq!(output_data, expected);
+
+    Ok(())
+}
+
+#[test]
+fn transfer() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    let a = ts.matrix(3, 3, 1, true, "A")?;
+    let b = ts.matrix(3, 3, 1, true, "B")?;
+
+    let a_content = &[
+        1., 2., 3., //
+        4., 5., 6., //
+        7., 8., 9., //
+        ];
+    ts.write(
+        a,
+        a_content,
+    )?;
+
+    ts.write(
+        b,
+        &[
+        10., 11., 12., //
+        13., 14., 15., //
+        16., 17., 18., //
+        ],
+    )?;
+
+    ts.transfer(a, b)?;
+    let mut buf = vec![0.; 3 * 3];
+    ts.read(b, &mut buf)?;
+    assert_eq!(&buf, a_content);
 
     Ok(())
 }
