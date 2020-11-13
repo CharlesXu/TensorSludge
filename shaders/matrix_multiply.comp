@@ -41,7 +41,7 @@ uint mat_idx(MatrixDims dim, uint row, uint col) {
 void main() {
     if (gid.x >= out_dim.cols || gid.y >= out_dim.rows || gid.z >= out_dim.layers) return;
 
-    uint inner_rc = bool(a_dim.trans) ? a_dim.cols : a_dim.rows;
+    uint inner_rc = bool(a_dim.trans) ? a_dim.rows : a_dim.cols;
 
     float sum = 0.;
     for (uint i = 0; i < inner_rc; i++) {

@@ -115,9 +115,9 @@ fn vector_dot() -> Result<()> {
     let mut ts = TensorSludge::new()?;
     const SIZE: usize = 3;
 
-    let a = ts.matrix(1, SIZE, "A")?;
-    let b = ts.matrix(SIZE, 1, "B")?;
-    let output = ts.matrix(1, 1, "Output")?;
+    let a = ts.matrix(1, SIZE, 1, true, "A")?;
+    let b = ts.matrix(SIZE, 1, 1, true, "B")?;
+    let output = ts.matrix(1, 1, 1, true, "Output")?;
 
     let pass = ts.create_pass(&[Operation::MatrixMultiply {
         left: a,
