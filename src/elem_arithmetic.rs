@@ -189,7 +189,7 @@ impl ElementwiseArithmetic {
                         .dst_binding(0)
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                            .buffer(*product.allocation().object())
+                            .buffer(product.buffer())
                             .offset(0)
                             .range(vk::WHOLE_SIZE)]),
                     vk::WriteDescriptorSetBuilder::new()
@@ -197,7 +197,7 @@ impl ElementwiseArithmetic {
                         .dst_binding(1)
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                            .buffer(*scalars.allocation().object())
+                            .buffer(scalars.buffer())
                             .offset(0)
                             .range(vk::WHOLE_SIZE)]),
                 ],

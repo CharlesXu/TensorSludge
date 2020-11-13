@@ -35,7 +35,7 @@ pub struct TensorSludge {
 }
 
 pub struct Core {
-    pub allocator: Mutex<GpuAllocator<DeviceLoader>>,
+    pub allocator: Mutex<GpuAllocator<vk::DeviceMemory>>,
     pub device: DeviceLoader,
     pub instance: InstanceLoader,
     _entry: DefaultEntryLoader,
@@ -180,8 +180,8 @@ impl TensorSludge {
         let dst = self.get_matrix(dst).context("DST was deleted")?;
         ensure!(src.size() == dst.size(), "Source and destination sizes must match exactly for transfer");
         let size = src.size_bytes();
-        let src = *src.allocation().object();
-        let dst = *dst.allocation().object();
+        let src = src.buffer();
+        let dst = dst.buffer();
 
         let region = vk::BufferCopyBuilder::new()
             .src_offset(0)
@@ -365,7 +365,7 @@ impl TensorSludge {
                             (false, false) => unreachable!(),
                         };
                         let buf_mem_barrier = vk::BufferMemoryBarrierBuilder::new()
-                            .buffer(*buffer.allocation().object())
+                            .buffer(buffer.buffer())
                             .src_access_mask(vk::AccessFlags::SHADER_WRITE)
                             .dst_access_mask(dst_flags)
                             .offset(0)
@@ -459,7 +459,7 @@ fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)>
 }
 
 impl Core {
-    pub fn allocator(&self) -> Result<MutexGuard<GpuAllocator<DeviceLoader>>> {
+    pub fn allocator(&self) -> Result<MutexGuard<GpuAllocator<vk::DeviceMemory>>> {
         self.allocator
             .lock()
             .map_err(|_| format_err!("GpuAllocator mutex poisoned"))

@@ -154,7 +154,7 @@ impl MatrixMultiply {
                         .dst_binding(0)
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                            .buffer(*a.allocation().object())
+                            .buffer(a.buffer())
                             .offset(0)
                             .range(vk::WHOLE_SIZE)]),
                     vk::WriteDescriptorSetBuilder::new()
@@ -162,7 +162,7 @@ impl MatrixMultiply {
                         .dst_binding(1)
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                            .buffer(*b.allocation().object())
+                            .buffer(b.buffer())
                             .offset(0)
                             .range(vk::WHOLE_SIZE)]),
                     vk::WriteDescriptorSetBuilder::new()
@@ -170,7 +170,7 @@ impl MatrixMultiply {
                         .dst_binding(2)
                         .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                         .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                            .buffer(*dst.allocation().object())
+                            .buffer(dst.buffer())
                             .offset(0)
                             .range(vk::WHOLE_SIZE)]),
                 ],

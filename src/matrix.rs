@@ -9,7 +9,7 @@ pub struct Matrix {
     cols: usize,
     layers: usize,
 
-    allocation: MemoryBlock<EruptMemoryDevice>,
+    allocation: Option<MemoryBlock<vk::DeviceMemory>>,
     buffer: vk::Buffer,
 
     core: SharedCore,
@@ -46,7 +46,7 @@ impl Matrix {
         let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
         use gpu_alloc::UsageFlags;
         let usage = match cpu_visible {
-            true => UsageFlags::DOWNLOAD | UsageFlags::UPLOAD,
+            true => UsageFlags::DOWNLOAD | UsageFlags::UPLOAD | gpu_alloc::UsageFlags::HOST_ACCESS,
             false => UsageFlags::FAST_DEVICE_ACCESS,
         };
 
@@ -57,17 +57,22 @@ impl Matrix {
             memory_types: !0,
         };
 
-        let wrap = EruptMemoryDevice::wrap(&core.device);
         let allocation = unsafe {
             core.allocator()?
-                .alloc(&wrap, request)?
+                .alloc(EruptMemoryDevice::wrap(&core.device), request)?
         };
+
+        unsafe {
+            core.device
+                .bind_buffer_memory(buffer, *allocation.memory(), allocation.offset())
+                .result()?;
+        }
 
         Ok(Self {
             rows,
             cols,
             layers,
-            allocation,
+            allocation: Some(allocation),
             buffer,
             core,
             name,
@@ -95,17 +100,12 @@ impl Matrix {
         self.rows() * self.cols() * self.layers() * std::mem::size_of::<f32>()
     }
 
-    pub fn allocation(&self) -> &Allocation<vk::Buffer> {
-        self.data.as_ref().unwrap()
+    pub(crate) fn buffer(&self) -> vk::Buffer {
+        self.buffer
     }
 
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    fn map(&mut self) -> Result<MappedMemory> {
-        let mapping = self.allocation().map(&self.core.device, ..).result()?;
-        Ok(mapping)
     }
 
     fn chk_buf_mismatch(&self, buf: &[f32]) -> Result<()> {
@@ -126,9 +126,13 @@ impl Matrix {
             bail!("Cannot read from GPU-only matrix \"{}\"", self.name());
         }
         self.chk_buf_mismatch(buf)?;
-        let mapping = self.map()?;
-        buf.copy_from_slice(&bytemuck::cast_slice(mapping.read())[..buf.len()]);
-        mapping.unmap(&self.core.device).result()?;
+        unsafe {
+            self.allocation.as_mut().unwrap().read_bytes(
+                EruptMemoryDevice::wrap(&self.core.device),
+                0,
+                bytemuck::cast_slice_mut(buf),
+            )?;
+        }
         Ok(())
     }
 
@@ -137,18 +141,25 @@ impl Matrix {
             bail!("Cannot write to GPU-only matrix \"{}\"", self.name());
         }
         self.chk_buf_mismatch(buf)?;
-        let mut mapping = self.map()?;
-        mapping.import(bytemuck::cast_slice(buf));
-        mapping.unmap(&self.core.device).result()?;
+        unsafe {
+            self.allocation.as_mut().unwrap().write_bytes(
+                EruptMemoryDevice::wrap(&self.core.device),
+                0,
+                &bytemuck::cast_slice(buf),
+            )?;
+        }
         Ok(())
     }
 }
 
 impl Drop for Matrix {
     fn drop(&mut self) {
-        self.core
-            .allocator()
-            .unwrap()
-            .free(&self.core.device, self.data.take().unwrap());
+        unsafe {
+            self.core.allocator().unwrap().dealloc(
+                EruptMemoryDevice::wrap(&self.core.device),
+                self.allocation.take().unwrap(),
+            );
+            self.core.device.destroy_buffer(Some(self.buffer), None);
+        }
     }
 }

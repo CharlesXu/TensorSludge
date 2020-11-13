@@ -101,7 +101,6 @@ impl ScalarOps {
     }
 
     pub fn invoke(&mut self, matrix: &Matrix, scalar: f32) -> Result<Invocation> {
-        let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
             self.core.device.update_descriptor_sets(
@@ -110,7 +109,7 @@ impl ScalarOps {
                     .dst_binding(0)
                     .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                     .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                        .buffer(*allocation.object())
+                        .buffer(matrix.buffer())
                         .offset(0)
                         .range(vk::WHOLE_SIZE)])],
                 &[],

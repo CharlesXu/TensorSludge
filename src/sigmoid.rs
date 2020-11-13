@@ -128,7 +128,6 @@ impl Sigmoid {
         matrix: &Matrix,
         pipeline: vk::Pipeline,
     ) -> Result<Invocation> {
-        let allocation = matrix.allocation();
         let descriptor_set = self.ds_allocator.pop()?;
         unsafe {
             self.core.device.update_descriptor_sets(
@@ -137,7 +136,7 @@ impl Sigmoid {
                     .dst_binding(0)
                     .descriptor_type(vk::DescriptorType::STORAGE_BUFFER)
                     .buffer_info(&[vk::DescriptorBufferInfoBuilder::new()
-                        .buffer(*allocation.object())
+                        .buffer(matrix.buffer())
                         .offset(0)
                         .range(vk::WHOLE_SIZE)])],
                 &[],
