@@ -109,6 +109,36 @@ fn matrix_multiply() -> Result<()> {
 }
 
 #[test]
+fn vector_dot() -> Result<()> {
+    let mut ts = TensorSludge::new()?;
+    const SIZE: usize = 3;
+
+    let a = ts.matrix(1, SIZE, "A")?;
+    let b = ts.matrix(SIZE, 1, "B")?;
+    let output = ts.matrix(1, 1, "Output")?;
+
+    let pass = ts.create_pass(&[Operation::MatrixMultiply {
+        left: a,
+        right: b,
+        dst: output,
+        left_transpose: false,
+        right_transpose: false,
+    }])?;
+
+    ts.write(a, &[1., 2., 3.])?;
+    ts.write(b, &[9., 8., 7.])?;
+
+    ts.flow(pass)?;
+
+    let mut out = [0.];
+    ts.read(output, &mut out)?;
+
+    assert_eq!(out, [46.]);
+
+    Ok(())
+}
+
+#[test]
 fn matrix_multiply_transposes() -> Result<()> {
     let mut ts = TensorSludge::new()?;
 
