@@ -8,7 +8,7 @@ use anyhow::{bail, format_err, ensure, Context, Result};
 use erupt::{
     cstr,
     utils::{
-        allocator::{Allocator, AllocatorCreateInfo},
+        //allocator::{GpuAllocator, AllocatorCreateInfo},
         loading::DefaultEntryLoader,
     },
     vk1_0 as vk, DeviceLoader, EntryLoader, InstanceLoader,
@@ -18,6 +18,7 @@ use std::collections::HashSet;
 use std::ffi::CString;
 use std::sync::MutexGuard;
 use std::sync::{Arc, Mutex};
+use gpu_alloc::{self, GpuAllocator};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
@@ -34,7 +35,7 @@ pub struct TensorSludge {
 }
 
 pub struct Core {
-    pub allocator: Mutex<Allocator>,
+    pub allocator: Mutex<GpuAllocator<DeviceLoader>>,
     pub device: DeviceLoader,
     pub instance: InstanceLoader,
     _entry: DefaultEntryLoader,
@@ -97,9 +98,10 @@ impl TensorSludge {
         let device = DeviceLoader::new(&instance, physical_device, &create_info, None)?;
         let queue = unsafe { device.get_device_queue(queue_family_index, 0, None) };
 
-        // Allocator
+        // GpuAllocator
+        let device_props = unsafe { gpu_alloc_erupt::device_properties(&instance, physical_device)? };
         let allocator =
-            Allocator::new(&instance, physical_device, AllocatorCreateInfo::default()).result()?;
+            GpuAllocator::new(gpu_alloc::Config::i_am_prototyping(), device_props);
 
         // Create command buffer
         // Command pool:
@@ -457,10 +459,10 @@ fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)>
 }
 
 impl Core {
-    pub fn allocator(&self) -> Result<MutexGuard<Allocator>> {
+    pub fn allocator(&self) -> Result<MutexGuard<GpuAllocator<DeviceLoader>>> {
         self.allocator
             .lock()
-            .map_err(|_| format_err!("Allocator mutex poisoned"))
+            .map_err(|_| format_err!("GpuAllocator mutex poisoned"))
     }
 }
 

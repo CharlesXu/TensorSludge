@@ -9,6 +9,8 @@ erupt = "0.15"
 anyhow = "1"
 genmap = "1.0"
 bytemuck = "1.4"
+gpu-alloc-erupt = "0.1"
+gpu-alloc = "0.1"
 
 [dev-dependencies]
 mnist = { version = "0.4", features = ["download"] }

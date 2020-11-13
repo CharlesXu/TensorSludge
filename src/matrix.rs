@@ -1,15 +1,17 @@
 use crate::engine::SharedCore;
 use anyhow::{bail, ensure, Result};
-use erupt::{
-    utils::allocator::{Allocation, MappedMemory, MemoryTypeFinder},
-    vk1_0 as vk,
-};
+use erupt::vk1_0 as vk;
+use gpu_alloc::{MemoryBlock, Request};
+use gpu_alloc_erupt::EruptMemoryDevice;
 
 pub struct Matrix {
     rows: usize,
     cols: usize,
     layers: usize,
-    data: Option<Allocation<vk::Buffer>>,
+
+    allocation: MemoryBlock<EruptMemoryDevice>,
+    buffer: vk::Buffer,
+
     core: SharedCore,
     name: String,
     cpu_visible: bool,
@@ -42,24 +44,31 @@ impl Matrix {
         // option? Still need to be able to write random numbers but a compute shader could be used
         // for that...
         let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
-        let data = core
-            .allocator()?
-            .allocate(
-                &core.device,
-                buffer,
-                match cpu_visible {
-                    true => MemoryTypeFinder::dynamic(),
-                    false => MemoryTypeFinder::gpu_only(),
-                },
-            )
-            .result()?;
-        let data = Some(data);
+        use gpu_alloc::UsageFlags;
+        let usage = match cpu_visible {
+            true => UsageFlags::DOWNLOAD | UsageFlags::UPLOAD,
+            false => UsageFlags::FAST_DEVICE_ACCESS,
+        };
+
+        let request = Request {
+            size: buffer_size as _,
+            align_mask: std::mem::align_of::<f32>() as _,
+            usage,
+            memory_types: !0,
+        };
+
+        let wrap = EruptMemoryDevice::wrap(&core.device);
+        let allocation = unsafe {
+            core.allocator()?
+                .alloc(&wrap, request)?
+        };
 
         Ok(Self {
             rows,
             cols,
             layers,
-            data,
+            allocation,
+            buffer,
             core,
             name,
             cpu_visible,
