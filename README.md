@@ -9,12 +9,11 @@ A small, GPU-accelerated neural net library I've built from scratch in order to 
 - [X] Scalar multiplication
 - [X] Automatic synchronization between operations
 - [X] Batches of size >1
-- [ ] Batch sum
-- [ ] GPU-only matricies
-- [ ] Softmax, and derivative
+- [X] Batch sum
+- [X] GPU-only matricies
+- [X] Softmax, and derivative
 - [ ] Models, saving and loading
 - [ ] Crossentropy, MSE, etc.
-- [ ] Better pipelining (Run forward pass of next batch while backpropagating, etc.)
 - [ ] Convolutional layers
 
 ## Examples
