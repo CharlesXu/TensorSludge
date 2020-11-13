@@ -40,10 +40,10 @@ impl Matrix {
             .sharing_mode(vk::SharingMode::EXCLUSIVE)
             .size(buffer_size as u64);
 
-        // TODO: This should really use a staging buffer... Perhaps make host-visible mats an
-        // option? Still need to be able to write random numbers but a compute shader could be used
-        // for that...
+        // Create a buffer
         let buffer = unsafe { core.device.create_buffer(&create_info, None, None) }.result()?;
+
+        // Allocate memory for it
         use gpu_alloc::UsageFlags;
         let usage = match cpu_visible {
             true => UsageFlags::DOWNLOAD | UsageFlags::UPLOAD | gpu_alloc::UsageFlags::HOST_ACCESS,
@@ -62,6 +62,7 @@ impl Matrix {
                 .alloc(EruptMemoryDevice::wrap(&core.device), request)?
         };
 
+        // Bind that memory
         unsafe {
             core.device
                 .bind_buffer_memory(buffer, *allocation.memory(), allocation.offset())

@@ -41,9 +41,9 @@ fn main() -> Result<()> {
     const HIDDEN_L1: usize = 128;
     const HIDDEN_L2: usize = 64;
     const OUTPUT_SIZE: usize = 10;
-    const BATCH_SIZE: usize = 10;
-    const LEARNING_RATE: f32 = 0.01;
-    const EPOCHS: usize = 2;
+    const BATCH_SIZE: usize = 50;
+    const LEARNING_RATE: f32 = 0.04;
+    const EPOCHS: usize = 5;
 
     // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1, BATCH_SIZE, true, "input_layer")?;
@@ -159,7 +159,8 @@ fn main() -> Result<()> {
     let mut output_buf = vec![0.; OUTPUT_SIZE * BATCH_SIZE];
 
     // Training loop
-    for _ in 0..EPOCHS {
+    for epoch in 1..=EPOCHS {
+        println!("Epoch {}/{}", epoch, EPOCHS);
         let mut num_correct = 0;
         let mut num_total = 0;
         for (idx, (labels, img)) in mnist
