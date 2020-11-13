@@ -204,6 +204,10 @@ impl TensorSludge {
         Ok(())
     }
 
+    pub fn remove_matrix(&mut self, mat: crate::Matrix) -> Result<()> {
+        Ok(drop(self.matrices.remove(mat.0)))
+    }
+
     /// Write data to a matrix in row-major order
     pub fn write(&mut self, matrix: crate::Matrix, data: &[f32]) -> Result<()> {
         self.get_matrix_mut(matrix)?.write(data)

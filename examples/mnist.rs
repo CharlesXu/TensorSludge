@@ -16,6 +16,7 @@ fn random_weights(
     let buf = unif.sample_iter(rng).take(size).collect::<Vec<f32>>();
     ts.write(tmp, &buf)?;
     ts.transfer(tmp, mat)?;
+    ts.remove_matrix(tmp)?;
     Ok(())
 }
 
@@ -41,6 +42,8 @@ fn main() -> Result<()> {
     const HIDDEN_L2: usize = 64;
     const OUTPUT_SIZE: usize = 10;
     const BATCH_SIZE: usize = 10;
+    const LEARNING_RATE: f32 = 0.01;
+    const EPOCHS: usize = 2;
 
     // Build weight and activation buffers
     let input_layer = ts.matrix(IMG_SIZE, 1, BATCH_SIZE, true, "input_layer")?;
@@ -94,8 +97,6 @@ fn main() -> Result<()> {
     ];
     let forward_pass = ts.create_pass(&forward_pass)?;
 
-    let learning_rate = 0.05;
-
     let backward_pass = vec![
         // The reverse boof
         Operation::MatrixMultiply {
@@ -114,7 +115,7 @@ fn main() -> Result<()> {
             left_transpose: true,
             right_transpose: false,
         },
-        Operation::ScalarMultiply(grad_l2, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l2, LEARNING_RATE), // Gradient update for layer 2
         Operation::InplaceSub(weights_l2, grad_l2),
         Operation::SigmoidDerivative(activations_l1), // More error propagation
         Operation::InplaceMultiply(error_l1, activations_l1),
@@ -135,7 +136,7 @@ fn main() -> Result<()> {
             left_transpose: true,
             right_transpose: false,
         },
-        Operation::ScalarMultiply(grad_l1, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l1, LEARNING_RATE), // Gradient update for layer 2
         Operation::InplaceSub(weights_l1, grad_l1),
         Operation::SigmoidDerivative(activations_l0), // More error propagation
         Operation::InplaceMultiply(error_l0, activations_l0),
@@ -148,7 +149,7 @@ fn main() -> Result<()> {
             left_transpose: false,
             right_transpose: true,
         },
-        Operation::ScalarMultiply(grad_l0, learning_rate), // Gradient update for layer 2
+        Operation::ScalarMultiply(grad_l0, LEARNING_RATE), // Gradient update for layer 2
         Operation::InplaceSub(weights_l0, grad_l0),
     ];
     let backward_pass = ts.create_pass(&backward_pass)?;
@@ -158,15 +159,54 @@ fn main() -> Result<()> {
     let mut output_buf = vec![0.; OUTPUT_SIZE * BATCH_SIZE];
 
     // Training loop
+    for _ in 0..EPOCHS {
+        let mut num_correct = 0;
+        let mut num_total = 0;
+        for (idx, (labels, img)) in mnist
+            .trn_lbl
+                .chunks_exact(BATCH_SIZE)
+                .zip(mnist.trn_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
+                .enumerate()
+                {
+                    // Feed forward
+                    image_norm(img, &mut input_buf);
+                    ts.write(input_layer, &input_buf)?;
+                    ts.flow(forward_pass)?;
+                    ts.read(output_layer, &mut output_buf)?;
+
+                    for (outputs, label) in output_buf.chunks_exact_mut(OUTPUT_SIZE).zip(labels) {
+                        if argmax(&outputs) == *label as usize {
+                            num_correct += 1;
+                        }
+                        num_total += 1;
+
+                        // Difference with train val
+                        outputs[*label as usize] -= 1.;
+
+                        // Softmax before backprop step
+                        softmax(outputs);
+                    }
+
+                    if idx % 100 == 0 {
+                        println!("Accuracy: {}", num_correct as f32 / num_total as f32);
+                        num_correct = 0;
+                        num_total = 0;
+                    }
+
+                    // Write to output error for backprop
+                    ts.write(output_error_layer, &output_buf)?;
+                    ts.flow(backward_pass)?;
+                }
+    }
+
+    println!("Computing accuracy...");
     let mut num_correct = 0;
     let mut num_total = 0;
-    for (idx, (labels, img)) in mnist
-        .trn_lbl
+    for (labels, img) in mnist
+        .tst_lbl
         .chunks_exact(BATCH_SIZE)
-        .zip(mnist.trn_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
-        .enumerate()
+        .zip(mnist.tst_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
     {
-        // Feed forward
         image_norm(img, &mut input_buf);
         ts.write(input_layer, &input_buf)?;
         ts.flow(forward_pass)?;
@@ -177,47 +217,10 @@ fn main() -> Result<()> {
                 num_correct += 1;
             }
             num_total += 1;
-
-            // Difference with train val
-            outputs[*label as usize] -= 1.;
         }
-
-        if idx % 100 == 0 {
-            println!("Accuracy: {}", num_correct as f32 / num_total as f32);
-            num_correct = 0;
-            num_total = 0;
-        }
-
-        // Softmax before backprop step
-        softmax(&mut output_buf);
-
-        // Write to output error for backprop
-        ts.write(output_error_layer, &output_buf)?;
-        ts.flow(backward_pass)?;
-    }
-
-    /*
-    println!("Computing accuracy...");
-    let mut num_correct = 0;
-    let mut num_total = 0;
-    for (label, img) in mnist
-        .tst_lbl
-        .iter()
-        .zip(mnist.tst_img.chunks_exact(IMG_SIZE))
-    {
-        image_norm(img, &mut input_buf);
-        ts.write(input_layer, &input_buf)?;
-        ts.flow(forward_pass)?;
-        ts.read(output_layer, &mut output_buf)?;
-
-        if argmax(&output_buf) == *label as usize {
-            num_correct += 1;
-        }
-        num_total += 1;
     }
 
     println!("Accuracy: {}", num_correct as f32 / num_total as f32);
-    */
 
     Ok(())
 }
