@@ -4,21 +4,13 @@ use crate::matrix_multiply::MatrixMultiply;
 use crate::scalar_ops::ScalarOps;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
-use anyhow::{bail, format_err, ensure, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use erupt::{
-    cstr,
-    utils::{
-        //allocator::{GpuAllocator, AllocatorCreateInfo},
-        loading::DefaultEntryLoader,
-    },
-    vk1_0 as vk, DeviceLoader, EntryLoader, InstanceLoader,
+    vk1_0 as vk, DeviceLoader,
 };
 use genmap::{GenMap, Handle};
 use std::collections::HashSet;
-use std::ffi::CString;
-use std::sync::MutexGuard;
-use std::sync::{Arc, Mutex};
-use gpu_alloc::{self, GpuAllocator};
+use vk_core::{Core, SharedCore};
 
 /// The TensorSludge engine
 pub struct TensorSludge {
@@ -30,99 +22,29 @@ pub struct TensorSludge {
     matrix_multiply: MatrixMultiply,
     elem_arithmetic: ElementwiseArithmetic,
     scalar_ops: ScalarOps,
-    queue: vk::Queue,
     core: SharedCore,
 }
-
-pub struct Core {
-    pub allocator: Mutex<GpuAllocator<vk::DeviceMemory>>,
-    pub device: DeviceLoader,
-    pub instance: InstanceLoader,
-    _entry: DefaultEntryLoader,
-}
-
-pub type SharedCore = Arc<Core>;
 
 impl TensorSludge {
     /// Create a new TensorSludge instance
     pub fn new() -> Result<Self> {
-        let entry = EntryLoader::new()?;
-
-        // Instance
-        let name = CString::new("TensorSludge")?;
-        let app_info = vk::ApplicationInfoBuilder::new()
-            .application_name(&name)
-            .application_version(vk::make_version(1, 0, 0))
-            .engine_name(&name)
-            .engine_version(vk::make_version(1, 0, 0))
-            .api_version(vk::make_version(1, 0, 0));
-
-        // Instance and device layers and extensions
-        let mut instance_layers = Vec::new();
-        let mut instance_extensions = Vec::new();
-        let mut device_layers = Vec::new();
-        let device_extensions = Vec::new();
-
-        // Vulkan layers and extensions
-        if cfg!(debug_assertions) {
-            const LAYER_KHRONOS_VALIDATION: *const i8 = cstr!("VK_LAYER_KHRONOS_validation");
-            instance_extensions
-                .push(erupt::extensions::ext_debug_utils::EXT_DEBUG_UTILS_EXTENSION_NAME);
-            instance_layers.push(LAYER_KHRONOS_VALIDATION);
-            device_layers.push(LAYER_KHRONOS_VALIDATION);
-        }
-
-        // Instance creation
-        let create_info = vk::InstanceCreateInfoBuilder::new()
-            .application_info(&app_info)
-            .enabled_extension_names(&instance_extensions)
-            .enabled_layer_names(&instance_layers);
-
-        let instance = InstanceLoader::new(&entry, &create_info, None)?;
-
-        // Hardware selection
-        let (queue_family_index, physical_device) = select_device(&instance)?;
-
-        // Create logical device and queues
-        let create_info = [vk::DeviceQueueCreateInfoBuilder::new()
-            .queue_family_index(queue_family_index)
-            .queue_priorities(&[1.0])];
-
-        let physical_device_features = vk::PhysicalDeviceFeaturesBuilder::new();
-        let create_info = vk::DeviceCreateInfoBuilder::new()
-            .queue_create_infos(&create_info)
-            .enabled_features(&physical_device_features)
-            .enabled_extension_names(&device_extensions)
-            .enabled_layer_names(&device_layers);
-
-        let device = DeviceLoader::new(&instance, physical_device, &create_info, None)?;
-        let queue = unsafe { device.get_device_queue(queue_family_index, 0, None) };
-
-        // GpuAllocator
-        let device_props = unsafe { gpu_alloc_erupt::device_properties(&instance, physical_device)? };
-        let allocator =
-            GpuAllocator::new(gpu_alloc::Config::i_am_prototyping(), device_props);
+        let (core, core_meta) = Core::compute(cfg!(debug_assertions), "TensorSludge")?;
 
         // Create command buffer
         // Command pool:
         let create_info = vk::CommandPoolCreateInfoBuilder::new()
-            .queue_family_index(queue_family_index)
+            .queue_family_index(core_meta.queue_family_index)
             .flags(vk::CommandPoolCreateFlags::RESET_COMMAND_BUFFER);
         let command_pool =
-            unsafe { device.create_command_pool(&create_info, None, None) }.result()?;
+            unsafe { core.device.create_command_pool(&create_info, None, None) }.result()?;
 
-        let core = Arc::new(Core {
-            allocator: Mutex::new(allocator),
-            device,
-            instance,
-            _entry: entry,
-        });
-
+        // Create ops
         let sigmoid = Sigmoid::new(core.clone())?;
         let matrix_multiply = MatrixMultiply::new(core.clone())?;
         let elem_arithmetic = ElementwiseArithmetic::new(core.clone())?;
         let scalar_ops = ScalarOps::new(core.clone())?;
 
+        // Create transfer command buffer
         let allocate_info = vk::CommandBufferAllocateInfoBuilder::new()
             .command_pool(command_pool)
             .level(vk::CommandBufferLevel::PRIMARY)
@@ -140,7 +62,6 @@ impl TensorSludge {
             matrices: GenMap::with_capacity(10),
             passes: GenMap::with_capacity(10),
             sigmoid,
-            queue,
             core,
         })
     }
@@ -198,9 +119,10 @@ impl TensorSludge {
             let submit_info = vk::SubmitInfoBuilder::new().command_buffers(&command_buffers);
             self.core
                 .device
-                .queue_submit(self.queue, &[submit_info], None)
+                .queue_submit(self.core.queue, &[submit_info], None)
                 .result()?;
-            self.core.device.queue_wait_idle(self.queue).result()?;
+            // TODO: Use a fence here!!
+            self.core.device.queue_wait_idle(self.core.queue).result()?;
         }
 
         Ok(())
@@ -420,9 +342,10 @@ impl TensorSludge {
             let submit_info = vk::SubmitInfoBuilder::new().command_buffers(&command_buffers);
             self.core
                 .device
-                .queue_submit(self.queue, &[submit_info], None)
+                .queue_submit(self.core.queue, &[submit_info], None)
                 .result()?;
-            self.core.device.queue_wait_idle(self.queue).result()?;
+            // TODO: SWITCH THIS TO A FENCE! So you can interop with other programs more smoothly..
+            self.core.device.queue_wait_idle(self.core.queue).result()?;
         }
 
         Ok(())
@@ -444,41 +367,10 @@ struct BufferAction {
     write: bool,
 }
 
-fn select_device(instance: &InstanceLoader) -> Result<(u32, vk::PhysicalDevice)> {
-    let physical_devices = unsafe { instance.enumerate_physical_devices(None) }.result()?;
-    for device in physical_devices {
-        let families =
-            unsafe { instance.get_physical_device_queue_family_properties(device, None) };
-        for (family, properites) in families.iter().enumerate() {
-            if properites.queue_flags.contains(vk::QueueFlags::COMPUTE) {
-                return Ok((family as u32, device));
-            }
-        }
-    }
-    Err(format_err!("No suitable device found"))
-}
-
-impl Core {
-    pub fn allocator(&self) -> Result<MutexGuard<GpuAllocator<vk::DeviceMemory>>> {
-        self.allocator
-            .lock()
-            .map_err(|_| format_err!("GpuAllocator mutex poisoned"))
-    }
-}
-
 impl Drop for TensorSludge {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_command_pool(Some(self.command_pool), None);
         }
-    }
-}
-
-impl Drop for Core {
-    fn drop(&mut self) {
-        unsafe { 
-            self.device.destroy_device(None);
-            self.instance.destroy_instance(None);
-        };
     }
 }

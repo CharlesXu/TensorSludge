@@ -1,5 +1,5 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
-use crate::engine::SharedCore;
+use vk_core::SharedCore;
 use crate::matrix::Matrix;
 use anyhow::{ensure, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};

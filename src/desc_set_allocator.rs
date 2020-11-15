@@ -1,4 +1,4 @@
-use crate::engine::SharedCore;
+use vk_core::SharedCore;
 use anyhow::Result;
 use erupt::vk1_0 as vk;
 
