@@ -5,9 +5,7 @@ use crate::scalar_ops::ScalarOps;
 use crate::sigmoid::Sigmoid;
 use crate::Operation;
 use anyhow::{bail, ensure, Context, Result};
-use erupt::{
-    vk1_0 as vk, DeviceLoader,
-};
+use erupt::{vk1_0 as vk, DeviceLoader};
 use genmap::{GenMap, Handle};
 use std::collections::HashSet;
 use vk_core::{Core, SharedCore};
@@ -99,7 +97,10 @@ impl TensorSludge {
     pub fn transfer(&mut self, src: crate::Matrix, dst: crate::Matrix) -> Result<()> {
         let src = self.get_matrix(src).context("SRC was deleted")?;
         let dst = self.get_matrix(dst).context("DST was deleted")?;
-        ensure!(src.size() == dst.size(), "Source and destination sizes must match exactly for transfer");
+        ensure!(
+            src.size() == dst.size(),
+            "Source and destination sizes must match exactly for transfer"
+        );
         let size = src.size_bytes();
         let src = src.buffer();
         let dst = dst.buffer();
@@ -110,11 +111,22 @@ impl TensorSludge {
             .size(size as _);
 
         unsafe {
-            self.core.device.reset_command_buffer(self.transfer_command_buffer, None).result()?;
+            self.core
+                .device
+                .reset_command_buffer(self.transfer_command_buffer, None)
+                .result()?;
             let begin_info = vk::CommandBufferBeginInfoBuilder::new();
-            self.core.device.begin_command_buffer(self.transfer_command_buffer, &begin_info).result()?;
-            self.core.device.cmd_copy_buffer(self.transfer_command_buffer, src, dst, &[region]);
-            self.core.device.end_command_buffer(self.transfer_command_buffer).result()?;
+            self.core
+                .device
+                .begin_command_buffer(self.transfer_command_buffer, &begin_info)
+                .result()?;
+            self.core
+                .device
+                .cmd_copy_buffer(self.transfer_command_buffer, src, dst, &[region]);
+            self.core
+                .device
+                .end_command_buffer(self.transfer_command_buffer)
+                .result()?;
             let command_buffers = [self.transfer_command_buffer];
             let submit_info = vk::SubmitInfoBuilder::new().command_buffers(&command_buffers);
             self.core
@@ -370,7 +382,9 @@ struct BufferAction {
 impl Drop for TensorSludge {
     fn drop(&mut self) {
         unsafe {
-            self.core.device.destroy_command_pool(Some(self.command_pool), None);
+            self.core
+                .device
+                .destroy_command_pool(Some(self.command_pool), None);
         }
     }
 }

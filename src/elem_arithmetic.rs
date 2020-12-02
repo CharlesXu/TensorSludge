@@ -1,9 +1,9 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
-use vk_core::SharedCore;
 use crate::matrix::Matrix;
 use anyhow::{ensure, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
+use vk_core::SharedCore;
 
 pub struct ElementwiseArithmetic {
     mult_pipeline: vk::Pipeline,
@@ -284,7 +284,9 @@ impl Drop for ElementwiseArithmetic {
             self.core
                 .device
                 .destroy_pipeline_layout(Some(self.pipeline_layout), None);
-            self.core.device.destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
+            self.core
+                .device
+                .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);
         }
     }
 }

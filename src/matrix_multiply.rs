@@ -1,9 +1,9 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
-use vk_core::SharedCore;
 use crate::matrix::Matrix;
 use anyhow::{bail, Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
+use vk_core::SharedCore;
 
 const LOCAL_SIZE_X: u32 = 16;
 const LOCAL_SIZE_Y: u32 = 16;
@@ -83,7 +83,6 @@ impl MatrixMultiply {
         let create_info = vk::ShaderModuleCreateInfoBuilder::new().code(&shader_decoded);
         let shader_module =
             unsafe { core.device.create_shader_module(&create_info, None, None) }.result()?;
-
 
         // Pipeline
         const PUSH_CONSTANT_SIZES: usize = std::mem::size_of::<SizeConstants>();
@@ -186,7 +185,8 @@ impl MatrixMultiply {
         };
 
         if !okay {
-            bail!("Cannot multiply; Matrix dimension mismatch between \"{}\" and \"{}\"",
+            bail!(
+                "Cannot multiply; Matrix dimension mismatch between \"{}\" and \"{}\"",
                 a.name(),
                 b.name(),
             );
@@ -283,7 +283,9 @@ impl Drop for MatrixMultiply {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
-            self.core.device.destroy_pipeline_layout(Some(self.pipeline_layout), None);
+            self.core
+                .device
+                .destroy_pipeline_layout(Some(self.pipeline_layout), None);
             self.core
                 .device
                 .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);

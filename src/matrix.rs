@@ -1,8 +1,8 @@
-use vk_core::SharedCore;
 use anyhow::{bail, ensure, Result};
 use erupt::vk1_0 as vk;
 use gpu_alloc::{MemoryBlock, Request};
 use gpu_alloc_erupt::EruptMemoryDevice;
+use vk_core::SharedCore;
 
 pub struct Matrix {
     rows: usize,

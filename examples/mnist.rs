@@ -165,39 +165,39 @@ fn main() -> Result<()> {
         let mut num_total = 0;
         for (idx, (labels, img)) in mnist
             .trn_lbl
-                .chunks_exact(BATCH_SIZE)
-                .zip(mnist.trn_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
-                .enumerate()
-                {
-                    // Feed forward
-                    image_norm(img, &mut input_buf);
-                    ts.write(input_layer, &input_buf)?;
-                    ts.flow(forward_pass)?;
-                    ts.read(output_layer, &mut output_buf)?;
+            .chunks_exact(BATCH_SIZE)
+            .zip(mnist.trn_img.chunks_exact(IMG_SIZE * BATCH_SIZE))
+            .enumerate()
+        {
+            // Feed forward
+            image_norm(img, &mut input_buf);
+            ts.write(input_layer, &input_buf)?;
+            ts.flow(forward_pass)?;
+            ts.read(output_layer, &mut output_buf)?;
 
-                    for (outputs, label) in output_buf.chunks_exact_mut(OUTPUT_SIZE).zip(labels) {
-                        if argmax(&outputs) == *label as usize {
-                            num_correct += 1;
-                        }
-                        num_total += 1;
-
-                        // Difference with train val
-                        outputs[*label as usize] -= 1.;
-
-                        // Softmax before backprop step
-                        softmax(outputs);
-                    }
-
-                    if idx % 100 == 0 {
-                        println!("Accuracy: {}", num_correct as f32 / num_total as f32);
-                        num_correct = 0;
-                        num_total = 0;
-                    }
-
-                    // Write to output error for backprop
-                    ts.write(output_error_layer, &output_buf)?;
-                    ts.flow(backward_pass)?;
+            for (outputs, label) in output_buf.chunks_exact_mut(OUTPUT_SIZE).zip(labels) {
+                if argmax(&outputs) == *label as usize {
+                    num_correct += 1;
                 }
+                num_total += 1;
+
+                // Difference with train val
+                outputs[*label as usize] -= 1.;
+
+                // Softmax before backprop step
+                softmax(outputs);
+            }
+
+            if idx % 100 == 0 {
+                println!("Accuracy: {}", num_correct as f32 / num_total as f32);
+                num_correct = 0;
+                num_total = 0;
+            }
+
+            // Write to output error for backprop
+            ts.write(output_error_layer, &output_buf)?;
+            ts.flow(backward_pass)?;
+        }
     }
 
     println!("Computing accuracy...");

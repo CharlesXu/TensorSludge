@@ -1,9 +1,9 @@
 use crate::desc_set_allocator::DescriptorSetAllocator;
-use vk_core::SharedCore;
 use crate::matrix::Matrix;
 use anyhow::{Context, Result};
 use erupt::{utils::decode_spv, vk1_0 as vk, DeviceLoader};
 use std::ffi::CString;
+use vk_core::SharedCore;
 
 pub struct ScalarOps {
     pipeline: vk::Pipeline,
@@ -166,7 +166,9 @@ impl Drop for ScalarOps {
     fn drop(&mut self) {
         unsafe {
             self.core.device.destroy_pipeline(Some(self.pipeline), None);
-            self.core.device.destroy_pipeline_layout(Some(self.pipeline_layout), None);
+            self.core
+                .device
+                .destroy_pipeline_layout(Some(self.pipeline_layout), None);
             self.core
                 .device
                 .destroy_descriptor_set_layout(Some(self.descriptor_set_layout), None);

@@ -1,6 +1,6 @@
-use vk_core::SharedCore;
 use anyhow::Result;
 use erupt::vk1_0 as vk;
+use vk_core::SharedCore;
 
 const ALLOCATION_SIZE: u32 = 15;
 
